@@ -1,0 +1,1557 @@
+// apps/api/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id              String   @id @default(uuid()) @map("id")
+  name            String   @map("name")
+  kms_code        String?  @unique @map("kms_code")
+  curriculum_type String   @default("CBC") @map("curriculum_type")
+  is_active       Boolean  @default(true) @map("is_active")
+  created_at      DateTime @default(now()) @map("created_at")
+  updated_at      DateTime @updatedAt @map("updated_at")
+
+  academicYears AcademicYear[]
+  classes       Class[]
+  students      Student[]
+  guardians     Guardian[]
+  users         User[]
+
+  // Added missing opposite relations
+  subjects           Subject[]
+  attendanceRecords  AttendanceRecord[]
+  biometricTemplates BiometricTemplate[]
+  exams              Exam[]
+  cbtExams           CBTExam[]
+  studyMaterials     StudyMaterial[]
+  clubs              Club[]
+  competitions       Competition[]
+  achievements       Achievement[]
+  feeStructures      FeeStructure[]
+  invoices           Invoice[]
+  payments           Payment[]
+  journalEntries     JournalEntry[]
+  feeWaivers         FeeWaiver[]
+  expenseCategories  ExpenseCategory[]
+  expenses           Expense[]
+  budgets            Budget[]
+  staff              Staff[]
+  leaveRequests      LeaveRequest[]
+  payrollRecords     PayrollRecord[]
+  staffAttendances   StaffAttendance[]
+  messageLogs        MessageLog[]
+  aiUsageLogs        AiUsageLog[]
+  aiQuotaAlerts      AiQuotaAlert[]
+  books              Book[]
+  bookLoans          BookLoan[]
+  drivers            Driver[]
+  buses              Bus[]
+  transportRoutes    TransportRoute[]
+  busAssignments     BusAssignment[]
+  dormitories        Dormitory[]
+  bedAssignments     BedAssignment[]
+  rollCalls          RollCall[]
+  suppliers          Supplier[]
+  inventoryItems     InventoryItem[]
+  requisitions       Requisition[]
+  purchaseOrders     PurchaseOrder[]
+  consentRecords     ConsentRecord[]
+  medicalRecords     MedicalRecord[]
+  clinicVisits       ClinicVisit[]
+  publicAnnouncements   PublicAnnouncement[]
+  contactSubmissions    ContactFormSubmission[]
+  subscription SchoolSubscription?
+  retentionPolicy   DataRetentionPolicy?
+  deletionRequests  DeletionRequest[]
+
+  @@map("schools")
+}
+
+model Role {
+  id          String       @id @default(uuid()) @map("id")
+  name        String       @unique @map("name")
+  description String?      @map("description")
+  permissions Permission[] @relation("RolePermissions")
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id    String @id @default(uuid()) @map("id")
+  name  String @unique @map("name")
+  roles Role[] @relation("RolePermissions")
+
+  @@map("permissions")
+}
+
+model User {
+  id        String  @id @default(uuid()) @map("id")
+  school_id String? @map("school_id")
+  school    School? @relation(fields: [school_id], references: [id])
+
+  email         String @map("email")
+  password_hash String @map("password_hash")
+  role_id       String @map("role_id")
+  role          Role   @relation(fields: [role_id], references: [id])
+
+  is_active            Boolean @default(true) @map("is_active")
+  must_change_password Boolean @default(false) @map("must_change_password")
+
+  password_history String[] @default([])
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  // Added missing opposite relations for Student and Guardian
+  student  Student?  @relation("StudentUser")
+  guardian Guardian? @relation("GuardianUser")
+
+  uploadedMaterials     StudyMaterial[] @relation("UploadedMaterials")
+  patronClubs           Club[]          @relation("PatronClubs")
+  requestedWaivers      FeeWaiver[]     @relation("WaiverRequests")
+  approvedWaivers       FeeWaiver[]     @relation("WaiverApprovals")
+  recordedExpenses      Expense[]       @relation("RecordedExpenses")
+  wardedDormitories     Dormitory[]     @relation("DormitoryWarden")
+  requestedRequisitions Requisition[]   @relation("RequisitionRequester")
+  approvedRequisitions  Requisition[]   @relation("RequisitionApprover")
+  staff                 Staff?
+
+  @@unique([email, school_id])
+  @@map("users")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @map("id")
+  school_id   String?  @map("school_id")
+  user_id     String?  @map("user_id")
+  action      String   @map("action")
+  entity_type String   @map("entity_type")
+  entity_id   String?  @map("entity_id")
+  old_values  Json?    @map("old_values")
+  new_values  Json?    @map("new_values")
+  ip_address  String?  @map("ip_address")
+  created_at  DateTime @default(now()) @map("created_at")
+
+  @@index([school_id, created_at])
+  @@map("audit_logs")
+}
+
+model AcademicYear {
+  id         String   @id @default(uuid()) @map("id")
+  school_id  String   @map("school_id")
+  school     School   @relation(fields: [school_id], references: [id])
+  name       String   @map("name")
+  start_date DateTime @map("start_date")
+  end_date   DateTime @map("end_date")
+  is_active  Boolean  @default(false) @map("is_active")
+
+  terms         Term[]
+  enrollments   Enrollment[]
+  feeStructures FeeStructure[]
+  budgets       Budget[]
+
+  @@unique([school_id, name])
+  @@map("academic_years")
+}
+
+model Term {
+  id               String         @id @default(uuid()) @map("id")
+  academic_year_id String         @map("academic_year_id")
+  academic_year    AcademicYear   @relation(fields: [academic_year_id], references: [id])
+  name             String         @map("name")
+  start_date       DateTime       @map("start_date")
+  end_date         DateTime       @map("end_date")
+  is_active        Boolean        @default(false) @map("is_active")
+  feeStructures    FeeStructure[]
+
+  @@unique([academic_year_id, name])
+  @@map("terms")
+}
+
+model Class {
+  id              String @id @default(uuid()) @map("id")
+  school_id       String @map("school_id")
+  school          School @relation(fields: [school_id], references: [id])
+  name            String @map("name")
+  level           Int    @map("level")
+  curriculum_type String @default("CBC") @map("curriculum_type")
+
+  streams        Stream[]
+  enrollments    Enrollment[]
+  subjects       ClassSubject[]
+  studyMaterials StudyMaterial[]
+  feeStructures  FeeStructure[]
+
+  @@unique([school_id, name])
+  @@map("classes")
+}
+
+model Stream {
+  id       String @id @default(uuid()) @map("id")
+  class_id String @map("class_id")
+  class    Class  @relation(fields: [class_id], references: [id])
+  name     String @map("name")
+  capacity Int    @default(40) @map("capacity")
+
+  students Student[]
+
+  @@unique([class_id, name])
+  @@map("streams")
+}
+
+model Student {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  admission_number  String   @map("admission_number")
+  first_name        String   @map("first_name")
+  middle_name       String?  @map("middle_name")
+  last_name         String   @map("last_name")
+  date_of_birth     DateTime @map("date_of_birth")
+  gender            String   @map("gender")
+  nationality       String   @map("nationality")
+  blood_group       String?  @map("blood_group")
+  medical_condition String?  @map("medical_condition")
+  photo_url         String?  @map("photo_url")
+
+  stream_id  String?     @map("stream_id")
+  stream     Stream?     @relation(fields: [stream_id], references: [id])
+  enrollment Enrollment?
+
+  status          String @default("ACTIVE") @map("status")
+  curriculum_type String @default("CBC") @map("curriculum_type")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  guardians GuardianStudent[]
+
+  // Updated relation with explicit name and foreign key
+  user_id String? @unique @map("user_id")
+  user    User?   @relation("StudentUser", fields: [user_id], references: [id])
+
+  examResults ExamResult[]
+
+  // Added missing opposite relations
+  attendanceRecords AttendanceRecord[]
+  biometricTemplate BiometricTemplate?
+  cbtSessions       CBTSession[]
+  materialDownloads StudyMaterialDownload[]
+  clubMemberships   ClubMember[]
+  achievements      Achievement[]
+  invoices          Invoice[]
+  bookLoans         BookLoan[]
+  busAssignments    BusAssignment[]
+  bedAssignments    BedAssignment[]
+  rollCallRecords   RollCallRecord[]
+  clinicVisits      ClinicVisit[]
+  medicalRecord     MedicalRecord?
+
+  @@unique([school_id, admission_number])
+  @@map("students")
+}
+
+model Guardian {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  first_name   String  @map("first_name")
+  last_name    String  @map("last_name")
+  phone        String  @map("phone")
+  email        String? @map("email")
+  relationship String  @map("relationship")
+  is_primary   Boolean @default(false) @map("is_primary")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  students GuardianStudent[]
+
+  // Updated relation with explicit name and foreign key
+  user_id String? @unique @map("user_id")
+  user    User?   @relation("GuardianUser", fields: [user_id], references: [id])
+
+  @@map("guardians")
+}
+
+model GuardianStudent {
+  guardian_id String   @map("guardian_id")
+  guardian    Guardian @relation(fields: [guardian_id], references: [id])
+  student_id  String   @map("student_id")
+  student     Student  @relation(fields: [student_id], references: [id])
+
+  @@id([guardian_id, student_id])
+  @@map("guardian_students")
+}
+
+model Enrollment {
+  id               String       @id @default(uuid()) @map("id")
+  student_id       String       @unique @map("student_id")
+  student          Student      @relation(fields: [student_id], references: [id])
+  academic_year_id String       @map("academic_year_id")
+  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
+  class_id         String       @map("class_id")
+  class            Class        @relation(fields: [class_id], references: [id])
+
+  admission_date DateTime @default(now()) @map("admission_date")
+  status         String   @default("ACTIVE") @map("status")
+
+  @@map("enrollments")
+}
+
+model Subject {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name      String  @map("name")
+  code      String  @map("code")
+  is_cbc    Boolean @default(false) @map("is_cbc")
+  is_active Boolean @default(true) @map("is_active")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  classes        ClassSubject[]
+  examResults    ExamResult[]
+  cbtExams       CBTExam[]
+  studyMaterials StudyMaterial[]
+
+  @@unique([school_id, code])
+  @@map("subjects")
+}
+
+model ClassSubject {
+  class_id   String  @map("class_id")
+  class      Class   @relation(fields: [class_id], references: [id])
+  subject_id String  @map("subject_id")
+  subject    Subject @relation(fields: [subject_id], references: [id])
+
+  is_compulsory Boolean @default(true) @map("is_compulsory")
+  teacher_id    String? @map("teacher_id")
+
+  @@id([class_id, subject_id])
+  @@map("class_subjects")
+}
+
+model AttendanceRecord {
+  id         String  @id @default(uuid()) @map("id")
+  school_id  String  @map("school_id")
+  school     School  @relation(fields: [school_id], references: [id])
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  date   DateTime @map("date") @db.Date
+  status String   @map("status")
+  method String   @default("MANUAL") @map("method")
+
+  client_updated_at DateTime? @map("client_updated_at")
+  server_updated_at DateTime  @default(now()) @map("server_updated_at")
+  is_conflict       Boolean   @default(false) @map("is_conflict")
+
+  marked_by String? @map("marked_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([student_id, date])
+  @@map("attendance_records")
+}
+
+model BiometricTemplate {
+  id         String  @id @default(uuid()) @map("id")
+  school_id  String  @map("school_id")
+  school     School  @relation(fields: [school_id], references: [id])
+  student_id String  @unique @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  template_data     String @map("template_data")
+  consent_record_id String @map("consent_record_id")
+
+  is_active  Boolean  @default(true) @map("is_active")
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("biometric_templates")
+}
+
+model Exam {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name             String @map("name")
+  type             String @map("type")
+  academic_year_id String @map("academic_year_id")
+  term_id          String @map("term_id")
+
+  start_date DateTime @map("start_date")
+  end_date   DateTime @map("end_date")
+  is_locked  Boolean  @default(false) @map("is_locked")
+
+  results ExamResult[]
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("exams")
+}
+
+model ExamResult {
+  id      String @id @default(uuid()) @map("id")
+  exam_id String @map("exam_id")
+  exam    Exam   @relation(fields: [exam_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  subject_id String  @map("subject_id")
+  subject    Subject @relation(fields: [subject_id], references: [id])
+
+  marks_obtained Float?  @map("marks_obtained")
+  max_marks      Float   @default(100) @map("max_marks")
+  grade          String? @map("grade")
+  remarks        String? @map("remarks")
+
+  is_cbc_assessment Boolean @default(false) @map("is_cbc_assessment")
+  cbc_rating        String? @map("cbc_rating")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([exam_id, student_id, subject_id])
+  @@map("exam_results")
+}
+
+model CBTExam {
+  id               String   @id @default(uuid()) @map("id")
+  school_id        String   @map("school_id")
+  school           School   @relation(fields: [school_id], references: [id])
+  title            String   @map("title")
+  subject_id       String   @map("subject_id")
+  subject          Subject  @relation(fields: [subject_id], references: [id])
+  duration_minutes Int      @map("duration_minutes")
+  total_marks      Float    @map("total_marks")
+  start_time       DateTime @map("start_time")
+  end_time         DateTime @map("end_time")
+  is_active        Boolean  @default(true) @map("is_active")
+
+  sessions  CBTSession[]
+  questions CBTQuestion[]
+
+  @@map("cbt_exams")
+}
+
+model CBTQuestion {
+  id             String  @id @default(uuid()) @map("id")
+  exam_id        String  @map("exam_id")
+  exam           CBTExam @relation(fields: [exam_id], references: [id])
+  question_text  String  @map("question_text")
+  question_type  String  @map("question_type") // MCQ, ESSAY, SHORT_ANSWER
+  options        Json?   @map("options") // e.g., ["A", "B", "C", "D"]
+  correct_answer String? @map("correct_answer")
+  marks          Float   @default(1.0) @map("marks")
+  rubric         String? @map("rubric") // AI grading rubric for essays
+
+  answers CBTAnswer[]
+
+  @@map("cbt_questions")
+}
+
+model CBTSession {
+  id         String  @id @default(uuid()) @map("id")
+  exam_id    String  @map("exam_id")
+  exam       CBTExam @relation(fields: [exam_id], references: [id])
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  start_time DateTime  @map("start_time")
+  end_time   DateTime? @map("end_time")
+  status     String    @default("ACTIVE") @map("status") // ACTIVE, SUBMITTED, TIMEOUT
+
+  proctoring_logs CBTProctoringLog[]
+  answers         CBTAnswer[]
+
+  @@unique([exam_id, student_id])
+  @@map("cbt_sessions")
+}
+
+model CBTAnswer {
+  id          String      @id @default(uuid()) @map("id")
+  session_id  String      @map("session_id")
+  session     CBTSession  @relation(fields: [session_id], references: [id])
+  question_id String      @map("question_id")
+  question    CBTQuestion @relation(fields: [question_id], references: [id])
+
+  student_answer    String   @map("student_answer")
+  client_updated_at DateTime @map("client_updated_at")
+  server_updated_at DateTime @default(now()) @map("server_updated_at")
+
+  @@unique([session_id, question_id])
+  @@map("cbt_answers")
+}
+
+model CBTProctoringLog {
+  id         String     @id @default(uuid()) @map("id")
+  session_id String     @map("session_id")
+  session    CBTSession @relation(fields: [session_id], references: [id])
+
+  event_type String   @map("event_type") // TAB_SWITCH, COPY_PASTE, BLUR
+  timestamp  DateTime @default(now()) @map("timestamp")
+  details    Json?    @map("details")
+
+  @@map("cbt_proctoring_logs")
+}
+
+// --- STUDY MATERIALS ---
+model StudyMaterial {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  title       String  @map("title")
+  description String? @map("description")
+  file_url    String  @map("file_url") // MinIO URL
+  file_type   String  @map("file_type") // PDF, DOC, VIDEO, LINK
+  visibility  String  @default("CLASS") @map("visibility") // CLASS, ALL_STUDENTS, TEACHERS
+
+  class_id String? @map("class_id")
+  class    Class?  @relation(fields: [class_id], references: [id])
+
+  subject_id String?  @map("subject_id")
+  subject    Subject? @relation(fields: [subject_id], references: [id])
+
+  uploaded_by String @map("uploaded_by")
+  uploader    User   @relation("UploadedMaterials", fields: [uploaded_by], references: [id])
+
+  version     Int     @default(1) @map("version")
+  is_archived Boolean @default(false) @map("is_archived")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  downloads StudyMaterialDownload[]
+
+  @@map("study_materials")
+}
+
+model StudyMaterialDownload {
+  id          String        @id @default(uuid()) @map("id")
+  material_id String        @map("material_id")
+  material    StudyMaterial @relation(fields: [material_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  downloaded_at DateTime @default(now()) @map("downloaded_at")
+
+  @@map("study_material_downloads")
+}
+
+// --- EXTRA-CURRICULAR ---
+model Club {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name             String  @map("name")
+  type             String  @map("type") // SPORT, CULTURAL, ACADEMIC, RELIGIOUS
+  description      String? @map("description")
+  meeting_schedule String? @map("meeting_schedule")
+
+  patron_teacher_id String @map("patron_teacher_id")
+  patron            User   @relation("PatronClubs", fields: [patron_teacher_id], references: [id])
+
+  is_active  Boolean  @default(true) @map("is_active")
+  created_at DateTime @default(now()) @map("created_at")
+
+  members      ClubMember[]
+  competitions Competition[]
+  achievements Achievement[]
+
+  @@map("clubs")
+}
+
+model ClubMember {
+  id      String @id @default(uuid()) @map("id")
+  club_id String @map("club_id")
+  club    Club   @relation(fields: [club_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  role      String   @default("MEMBER") @map("role") // MEMBER, LEADER, CAPTAIN
+  joined_at DateTime @default(now()) @map("joined_at")
+
+  @@unique([club_id, student_id])
+  @@map("club_members")
+}
+
+model Competition {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  club_id String @map("club_id")
+  club    Club   @relation(fields: [club_id], references: [id])
+
+  name       String   @map("name") // e.g., "Inter-school Debate Finals"
+  opponent   String?  @map("opponent")
+  venue      String   @map("venue")
+  event_date DateTime @map("event_date")
+  result     String?  @map("result") // WIN, LOSS, DRAW, PENDING
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@map("competitions")
+}
+
+model Achievement {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  student_id String?  @map("student_id")
+  student    Student? @relation(fields: [student_id], references: [id])
+
+  club_id String? @map("club_id")
+  club    Club?   @relation(fields: [club_id], references: [id])
+
+  title         String   @map("title") // e.g., "National Science Fair 1st Place"
+  description   String?  @map("description")
+  evidence_url  String?  @map("evidence_url") // MinIO URL for certificate/photo
+  achieved_date DateTime @default(now()) @map("achieved_date")
+
+  @@map("achievements")
+}
+
+// --- FEE STRUCTURE & CATEGORIES ---
+model FeeStructure {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  academic_year_id String       @map("academic_year_id")
+  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
+
+  term_id String @map("term_id")
+  term    Term   @relation(fields: [term_id], references: [id])
+
+  class_id String @map("class_id")
+  class    Class  @relation(fields: [class_id], references: [id])
+
+  name         String  @map("name") // e.g., "Grade 4 Term 1 Fees 2026"
+  total_amount Float   @map("total_amount")
+  is_active    Boolean @default(true) @map("is_active")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  categories FeeCategory[]
+  invoices   Invoice[]
+
+  @@unique([school_id, academic_year_id, term_id, class_id])
+  @@map("fee_structures")
+}
+
+model FeeCategory {
+  id               String       @id @default(uuid()) @map("id")
+  fee_structure_id String       @map("fee_structure_id")
+  fee_structure    FeeStructure @relation(fields: [fee_structure_id], references: [id])
+
+  name   String @map("name") // e.g., Tuition, Boarding, Lunch
+  amount Float  @map("amount")
+
+  @@map("fee_categories")
+}
+
+// --- INVOICES & PAYMENTS ---
+model Invoice {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  fee_structure_id String       @map("fee_structure_id")
+  fee_structure    FeeStructure @relation(fields: [fee_structure_id], references: [id])
+
+  term_id String @map("term_id")
+
+  total_amount  Float @map("total_amount")
+  paid_amount   Float @default(0) @map("paid_amount")
+  waived_amount Float @default(0) @map("waived_amount")
+
+  status   String   @default("UNPAID") @map("status") // UNPAID, PARTIAL, PAID, VOID
+  due_date DateTime @map("due_date")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  payments    Payment[]
+  fee_waivers FeeWaiver[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  invoice_id String  @map("invoice_id")
+  invoice    Invoice @relation(fields: [invoice_id], references: [id])
+
+  amount    Float  @map("amount")
+  method    String @map("method") // MPESA, CASH, BANK, CARD
+  reference String @map("reference") // MPESA Receipt No or Bank Ref
+
+  // MPESA State Machine & Daraja Specifics (REQ-MPESA-001 to 005)
+  mpesa_state         String  @default("INITIATED") @map("mpesa_state") // INITIATED, PENDING, SUCCESS, FAILED, RECONCILING
+  checkout_request_id String? @unique @map("checkout_request_id") // Idempotency key
+  merchant_request_id String? @map("merchant_request_id")
+  result_code         Int?    @map("result_code") // 0 for success
+  result_desc         String? @map("result_desc")
+  phone_number        String? @map("phone_number")
+
+  status     String   @default("PENDING") @map("status") // PENDING, SUCCESS, FAILED
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([school_id, checkout_request_id])
+  @@map("payments")
+}
+
+// --- DOUBLE-ENTRY ACCOUNTING (IMMUTABLE) ---
+// --- UPDATE JOURNAL ENTRY FOR CORRECTIONS ---
+model JournalEntry {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  transaction_id String @map("transaction_id")
+  account_code   String @map("account_code")
+  description    String @map("description")
+
+  debit  Float @default(0) @map("debit")
+  credit Float @default(0) @map("credit")
+
+  // If this entry is a correction, it points to the original transaction_id
+  reverses_transaction_id String? @map("reverses_transaction_id")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@index([school_id, transaction_id])
+  @@index([school_id, account_code, created_at])
+  @@map("journal_entries")
+}
+
+// --- EXPENSE CATEGORIES & TRACKING ---
+model ExpenseCategory {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name       String   @map("name") // e.g., Utilities, Supplies
+  code       String   @map("code") // e.g., 5010, 5020 (Maps to GL Account)
+  created_at DateTime @default(now()) @map("created_at")
+
+  expenses Expense[]
+  budgets  Budget[]
+
+  @@unique([school_id, code])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  category_id String          @map("category_id")
+  category    ExpenseCategory @relation(fields: [category_id], references: [id])
+
+  amount         Float    @map("amount")
+  description    String   @map("description")
+  vendor         String?  @map("vendor")
+  receipt_url    String?  @map("receipt_url") // MinIO URL
+  incurred_date  DateTime @map("incurred_date")
+  payment_method String   @map("payment_method") // CASH, BANK, MPESA
+
+  recorded_by String @map("recorded_by")
+  recorder    User   @relation("RecordedExpenses", fields: [recorded_by], references: [id])
+
+  status     String   @default("POSTED") @map("status") // DRAFT, POSTED, VOIDED
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@map("expenses")
+}
+
+// --- BUDGETING ---
+model Budget {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  category_id String          @map("category_id")
+  category    ExpenseCategory @relation(fields: [category_id], references: [id])
+
+  academic_year_id String       @map("academic_year_id")
+  academic_year    AcademicYear @relation(fields: [academic_year_id], references: [id])
+
+  allocated_amount Float    @map("allocated_amount")
+  created_at       DateTime @default(now()) @map("created_at")
+
+  @@unique([school_id, category_id, academic_year_id])
+  @@map("budgets")
+}
+
+model FeeWaiver {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  invoice_id String  @map("invoice_id")
+  invoice    Invoice @relation(fields: [invoice_id], references: [id])
+
+  requested_by_id String @map("requested_by_id")
+  requested_by    User   @relation("WaiverRequests", fields: [requested_by_id], references: [id])
+
+  approved_by_id String? @map("approved_by_id")
+  approved_by    User?   @relation("WaiverApprovals", fields: [approved_by_id], references: [id])
+
+  waiver_amount  Float  @map("waiver_amount")
+  waiver_percent Float  @map("waiver_percent")
+  status         String @default("PENDING") @map("status") // PENDING, APPROVED, REJECTED
+
+  // Routing logic
+  required_approver String  @map("required_approver") // finance_officer, school_admin, board
+  justification     String  @map("justification")
+  rejection_reason  String? @map("rejection_reason")
+
+  // REQ-WAIVER-007: Board-level waivers require resolution document
+  board_resolution_url String? @map("board_resolution_url")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("fee_waivers")
+}
+
+// apps/api/prisma/schema.prisma (Additions)
+
+// --- HR & STAFF RECORDS ---
+model Staff {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  user_id String @unique @map("user_id")
+  user    User   @relation(fields: [user_id], references: [id])
+
+  employee_id   String   @map("employee_id") // STF/YYYY/####
+  first_name    String   @map("first_name")
+  last_name     String   @map("last_name")
+  date_of_birth DateTime @map("date_of_birth")
+  gender        String   @map("gender")
+  national_id   String   @map("national_id") // AES-256 Encrypted
+  phone         String   @map("phone")
+  email         String   @map("email")
+
+  // TSC Details (SRS 18.1: Applicable ONLY if role is Teacher)
+  tsc_number String? @map("tsc_number")
+
+  // Financial & Statutory Details (AES-256 Encrypted)
+  kra_pin      String? @map("kra_pin")
+  nssf_number  String? @map("nssf_number")
+  nhif_number  String? @map("nhif_number")
+  bank_account String? @map("bank_account")
+
+  basic_salary    Float    @map("basic_salary")
+  employment_type String   @default("PERMANENT") @map("employment_type") // PERMANENT, CONTRACT, PART_TIME
+  date_joined     DateTime @map("date_joined")
+
+  // Soft Delete Trio
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  leaveRequests  LeaveRequest[]
+  payrollRecords PayrollRecord[]
+  attendances    StaffAttendance[]
+
+  @@unique([school_id, employee_id])
+  @@map("staff")
+}
+
+// --- LEAVE MANAGEMENT ---
+model LeaveRequest {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  staff_id String @map("staff_id")
+  staff    Staff  @relation(fields: [staff_id], references: [id])
+
+  leave_type String   @map("leave_type") // ANNUAL, SICK, MATERNITY, EMERGENCY, UNPAID
+  start_date DateTime @map("start_date")
+  end_date   DateTime @map("end_date")
+  reason     String   @map("reason")
+
+  status      String  @default("PENDING") @map("status") // PENDING, APPROVED, REJECTED
+  approved_by String? @map("approved_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("leave_requests")
+}
+
+// --- PAYROLL ---
+model PayrollRecord {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  staff_id String @map("staff_id")
+  staff    Staff  @relation(fields: [staff_id], references: [id])
+
+  month Int @map("month") // 1-12
+  year  Int @map("year")
+
+  basic_pay      Float @map("basic_pay")
+  allowances     Float @default(0) @map("allowances")
+  paye_deduction Float @default(0) @map("paye_deduction")
+  nssf_deduction Float @default(0) @map("nssf_deduction")
+  nhif_deduction Float @default(0) @map("nhif_deduction")
+  net_pay        Float @map("net_pay")
+
+  status String @default("DRAFT") @map("status") // DRAFT, POSTED, PAID
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@unique([staff_id, month, year])
+  @@map("payroll_records")
+}
+
+// --- STAFF ATTENDANCE ---
+model StaffAttendance {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  staff_id String @map("staff_id")
+  staff    Staff  @relation(fields: [staff_id], references: [id])
+
+  date      DateTime  @map("date") @db.Date
+  check_in  DateTime? @map("check_in")
+  check_out DateTime? @map("check_out")
+  status    String    @map("status") // PRESENT, ABSENT, ON_LEAVE, LATE
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([staff_id, date])
+  @@map("staff_attendances")
+}
+
+// --- COMMUNICATION LOGS ---
+model MessageLog {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  channel           String  @map("channel") // SMS, EMAIL, WHATSAPP
+  recipient_type    String  @map("recipient_type") // ALL, CLASS, INDIVIDUAL, STAFF
+  recipient_id      String? @map("recipient_id") // Linked Student/Staff/Parent ID if applicable
+  recipient_contact String  @map("recipient_contact") // Phone number or Email address
+
+  subject String? @map("subject") // Used for Email
+  body    String  @map("body")
+
+  status String @default("PENDING") @map("status") // PENDING, SENT, FAILED, FALLBACK_TRIGGERED
+
+  retry_count   Int     @default(0) @map("retry_count")
+  error_message String? @map("error_message")
+
+  // Metadata for tracking costs or external provider IDs
+  provider_message_id String? @map("provider_message_id")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@index([school_id, channel, created_at])
+  @@map("message_logs")
+}
+
+// --- AI USAGE & COST TRACKING ---
+model AiUsageLog {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  provider String @map("provider") // ANTHROPIC, OPENAI, OLLAMA
+  model    String @map("model") // e.g., claude-3-sonnet, gpt-4, llama3
+  feature  String @map("feature") // CBT_GRADING, CHATBOT, ANALYTICS
+
+  prompt_tokens     Int   @map("prompt_tokens")
+  completion_tokens Int   @map("completion_tokens")
+  total_tokens      Int   @map("total_tokens")
+  estimated_cost    Float @map("estimated_cost") // Cost in KES
+
+  user_id String? @map("user_id")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@index([school_id, created_at])
+  @@map("ai_usage_logs")
+}
+
+// --- AI QUOTA ALERT TRACKING ---
+model AiQuotaAlert {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  month Int @map("month") // 1-12
+  year  Int @map("year")
+
+  alerted_at DateTime @default(now()) @map("alerted_at")
+
+  @@unique([school_id, month, year])
+  @@map("ai_quota_alerts")
+}
+
+// --- LIBRARY MANAGEMENT ---
+model Book {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  isbn     String @map("isbn")
+  title    String @map("title")
+  author   String @map("author")
+  barcode  String @unique @map("barcode")
+  category String @map("category") // FICTION, TEXTBOOK, REFERENCE
+
+  total_copies     Int @default(1) @map("total_copies")
+  available_copies Int @default(1) @map("available_copies")
+
+  is_digital Boolean @default(false) @map("is_digital")
+  file_url   String? @map("file_url") // MinIO URL for e-books
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  loans BookLoan[]
+
+  @@unique([school_id, isbn])
+  @@map("books")
+}
+
+model BookLoan {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  book_id String @map("book_id")
+  book    Book   @relation(fields: [book_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  borrow_date DateTime  @default(now()) @map("borrow_date")
+  due_date    DateTime  @map("due_date")
+  return_date DateTime? @map("return_date")
+
+  status      String @default("BORROWED") @map("status") // BORROWED, RETURNED, OVERDUE
+  fine_amount Float  @default(0) @map("fine_amount")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@map("book_loans")
+}
+
+// --- TRANSPORT MANAGEMENT ---
+model Driver {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name           String @map("name")
+  phone          String @map("phone")
+  license_number String @unique @map("license_number")
+  status         String @default("ACTIVE") @map("status") // ACTIVE, SUSPENDED
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  buses Bus[]
+
+  @@map("drivers")
+}
+
+model Bus {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  registration_number String @unique @map("registration_number")
+  capacity            Int    @map("capacity")
+
+  driver_id String? @map("driver_id")
+  driver    Driver? @relation(fields: [driver_id], references: [id])
+
+  status String @default("ACTIVE") @map("status") // ACTIVE, MAINTENANCE, RETIRED
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  routes TransportRoute[]
+
+  @@map("buses")
+}
+
+model TransportRoute {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  bus_id String @map("bus_id")
+  bus    Bus    @relation(fields: [bus_id], references: [id])
+
+  name           String @map("name") // e.g., "Route A - Nairobi CBD"
+  start_point    String @map("start_point")
+  end_point      String @map("end_point")
+  estimated_time Int    @map("estimated_time") // in minutes
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  assignments BusAssignment[]
+
+  @@map("transport_routes")
+}
+
+model BusAssignment {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  route_id String         @map("route_id")
+  route    TransportRoute @relation(fields: [route_id], references: [id])
+
+  pickup_point  String @map("pickup_point")
+  dropoff_point String @map("dropoff_point")
+  status        String @default("ACTIVE") @map("status") // ACTIVE, INACTIVE
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([student_id, route_id])
+  @@map("bus_assignments")
+}
+
+// --- BOARDING / HOSTEL MANAGEMENT ---
+model Dormitory {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name      String  @map("name")
+  type      String  @map("type") // BOYS, GIRLS, STAFF
+  capacity  Int     @map("capacity")
+  warden_id String? @map("warden_id")
+  warden    User?   @relation("DormitoryWarden", fields: [warden_id], references: [id])
+
+  is_active  Boolean  @default(true) @map("is_active")
+  created_at DateTime @default(now()) @map("created_at")
+
+  beds      Bed[]
+  rollCalls RollCall[]
+
+  @@map("dormitories")
+}
+
+model Bed {
+  id           String    @id @default(uuid()) @map("id")
+  dormitory_id String    @map("dormitory_id")
+  dormitory    Dormitory @relation(fields: [dormitory_id], references: [id])
+
+  room_number String @map("room_number")
+  bed_number  String @map("bed_number")
+  status      String @default("AVAILABLE") @map("status") // AVAILABLE, OCCUPIED, MAINTENANCE
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  assignments BedAssignment[]
+
+  @@unique([dormitory_id, room_number, bed_number])
+  @@map("beds")
+}
+
+model BedAssignment {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  bed_id String @map("bed_id")
+  bed    Bed    @relation(fields: [bed_id], references: [id])
+
+  academic_year_id String    @map("academic_year_id")
+  check_in_date    DateTime  @default(now()) @map("check_in_date")
+  check_out_date   DateTime? @map("check_out_date")
+  status           String    @default("ACTIVE") @map("status") // ACTIVE, CHECKED_OUT
+
+  @@unique([student_id, academic_year_id])
+  @@map("bed_assignments")
+}
+
+model RollCall {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  dormitory_id String    @map("dormitory_id")
+  dormitory    Dormitory @relation(fields: [dormitory_id], references: [id])
+
+  date      DateTime @map("date") @db.Date
+  time      DateTime @map("time")
+  session   String   @map("session") // MORNING, EVENING
+  marked_by String   @map("marked_by")
+
+  records RollCallRecord[]
+
+  @@map("roll_calls")
+}
+
+model RollCallRecord {
+  id           String   @id @default(uuid()) @map("id")
+  roll_call_id String   @map("roll_call_id")
+  roll_call    RollCall @relation(fields: [roll_call_id], references: [id])
+
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  status String @map("status") // PRESENT, ABSENT, SICK, PERMISSION
+
+  @@unique([roll_call_id, student_id])
+  @@map("roll_call_records")
+}
+
+// --- INVENTORY & PROCUREMENT ---
+model Supplier {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name           String  @map("name")
+  contact_person String? @map("contact_person")
+  phone          String  @map("phone")
+  email          String? @map("email")
+  status         String  @default("ACTIVE") @map("status")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model InventoryItem {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  name          String @map("name")
+  sku           String @map("sku")
+  category      String @map("category") // ACADEMIC, MAINTENANCE, KITCHEN, OFFICE
+  quantity      Int    @default(0) @map("quantity")
+  unit_cost     Float  @default(0) @map("unit_cost")
+  reorder_level Int    @default(5) @map("reorder_level")
+
+  is_deleted Boolean   @default(false) @map("is_deleted")
+  deleted_at DateTime? @map("deleted_at")
+  deleted_by String?   @map("deleted_by")
+
+  created_at DateTime @default(now()) @map("created_at")
+
+  requisitions Requisition[]
+  poItems      PurchaseOrderItem[]
+
+  @@unique([school_id, sku])
+  @@map("inventory_items")
+}
+
+model Requisition {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  item_id String        @map("item_id")
+  item    InventoryItem @relation(fields: [item_id], references: [id])
+
+  requested_by String @map("requested_by")
+  requester    User   @relation("RequisitionRequester", fields: [requested_by], references: [id])
+
+  quantity      Int    @map("quantity")
+  justification String @map("justification")
+  status        String @default("PENDING") @map("status") // PENDING, APPROVED, REJECTED, PO_ISSUED
+
+  approved_by String? @map("approved_by")
+  approver    User?   @relation("RequisitionApprover", fields: [approved_by], references: [id])
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  purchaseOrder PurchaseOrder?
+
+  @@map("requisitions")
+}
+
+model PurchaseOrder {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  requisition_id String      @unique @map("requisition_id")
+  requisition    Requisition @relation(fields: [requisition_id], references: [id])
+
+  supplier_id String   @map("supplier_id")
+  supplier    Supplier @relation(fields: [supplier_id], references: [id])
+
+  total_amount Float    @map("total_amount")
+  status       String   @default("DRAFT") @map("status") // DRAFT, SENT, RECEIVED, CANCELLED
+  order_date   DateTime @default(now()) @map("order_date")
+
+  items PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id                String        @id @default(uuid()) @map("id")
+  purchase_order_id String        @map("purchase_order_id")
+  purchase_order    PurchaseOrder @relation(fields: [purchase_order_id], references: [id])
+
+  item_id String        @map("item_id")
+  item    InventoryItem @relation(fields: [item_id], references: [id])
+
+  quantity          Int   @map("quantity")
+  unit_cost         Float @map("unit_cost")
+  received_quantity Int   @default(0) @map("received_quantity") // For GRN (Goods Received Note)
+
+  @@map("purchase_order_items")
+}
+
+// --- KDPA CONSENT REGISTER (IMMUTABLE) ---
+model ConsentRecord {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  data_subject_id String @map("data_subject_id") // Student or Guardian ID
+  data_category   String @map("data_category") // MEDICAL, BIOMETRIC, MARKETING
+
+  consent_granted Boolean   @default(true) @map("consent_granted")
+  granted_at      DateTime  @default(now()) @map("granted_at")
+  revoked_at      DateTime? @map("revoked_at") // Null means active
+
+  evidence_url String? @map("evidence_url") // MinIO URL of signed physical form
+
+  // No updated_at. If revoked, we update revoked_at. If re-granted, we create a NEW record.
+  @@index([data_subject_id, data_category, revoked_at])
+  @@map("consent_records")
+}
+
+// --- HEALTH & CLINIC MANAGEMENT ---
+model MedicalRecord {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  student_id String  @unique @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  // REQ-KDPA-008: Sensitive health data encrypted at rest
+  allergies           String @map("allergies") // AES-256 Encrypted
+  chronic_conditions  String @map("chronic_conditions") // AES-256 Encrypted
+  current_medications String @map("current_medications") // AES-256 Encrypted
+
+  consent_record_id String @map("consent_record_id")
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  visits ClinicVisit[]
+
+  @@map("medical_records")
+}
+
+model ClinicVisit {
+  id        String @id @default(uuid()) @map("id")
+  school_id String @map("school_id")
+  school    School @relation(fields: [school_id], references: [id])
+
+  // Added the missing opposite relation to Student
+  student_id String  @map("student_id")
+  student    Student @relation(fields: [student_id], references: [id])
+
+  medical_record_id String        @map("medical_record_id")
+  medical_record    MedicalRecord @relation(fields: [medical_record_id], references: [id])
+
+  visit_date  DateTime @default(now()) @map("visit_date")
+  symptoms    String   @map("symptoms")
+  diagnosis   String?  @map("diagnosis")
+  treatment   String   @map("treatment")
+  nurse_notes String?  @map("nurse_notes")
+
+  attended_by String @map("attended_by") // Staff/User ID of the nurse
+
+  @@map("clinic_visits")
+}
+
+// --- PUBLIC WEBSITE CMS ---
+model PublicAnnouncement {
+  id            String   @id @default(uuid()) @map("id")
+  school_id     String   @map("school_id")
+  school        School   @relation(fields: [school_id], references: [id])
+  
+  title         String   @map("title")
+  content       String   @map("content") // Supports HTML/Markdown
+  publish_date  DateTime @default(now()) @map("publish_date")
+  is_active     Boolean  @default(true) @map("is_active")
+  
+  created_by    String   @map("created_by")
+  created_at    DateTime @default(now()) @map("created_at")
+  updated_at    DateTime @updatedAt @map("updated_at")
+
+  @@map("public_announcements")
+}
+
+model ContactFormSubmission {
+  id            String   @id @default(uuid()) @map("id")
+  school_id     String   @map("school_id")
+  school        School   @relation(fields: [school_id], references: [id])
+  
+  name          String   @map("name")
+  email         String   @map("email")
+  phone         String?  @map("phone")
+  subject       String   @map("subject")
+  message       String   @map("message")
+  
+  status        String   @default("NEW") @map("status") // NEW, IN_PROGRESS, RESOLVED, SPAM
+  admin_notes   String?  @map("admin_notes")
+  
+  created_at    DateTime @default(now()) @map("created_at")
+  updated_at    DateTime @updatedAt @map("updated_at")
+
+  @@map("contact_form_submissions")
+}
+
+model SchoolSubscription {
+  id                    String   @id @default(uuid()) @map("id")
+  school_id             String   @unique @map("school_id")
+  school                School   @relation(fields: [school_id], references: [id])
+  
+  plan_tier             String   @default("BASIC") @map("plan_tier") // BASIC, STANDARD, PREMIUM, ENTERPRISE
+  status                String   @default("ACTIVE") @map("status") // ACTIVE, GRACE_PERIOD, SUSPENDED, CANCELLED
+  
+  current_period_start  DateTime @map("current_period_start")
+  current_period_end    DateTime @map("current_period_end")
+  grace_period_ends_at  DateTime? @map("grace_period_ends_at")
+  
+  external_customer_id  String?  @map("external_customer_id") // Stripe/Pesapal customer ID
+  payment_method        String?  @map("payment_method") // STRIPE, PESAPAL, MPESA_PAYBILL
+  
+  created_at            DateTime @default(now()) @map("created_at")
+  updated_at            DateTime @updatedAt @map("updated_at")
+
+  @@map("school_subscriptions")
+}
+
+// --- KDPA DATA RETENTION POLICY ---
+model DataRetentionPolicy {
+  id                          String   @id @default(uuid()) @map("id")
+  school_id                   String   @unique @map("school_id")
+  school                      School   @relation(fields: [school_id], references: [id])
+  
+  soft_delete_purge_days      Int      @default(90) @map("soft_delete_purge_days")
+  audit_log_retention_years   Int      @default(3) @map("audit_log_retention_years")
+  alumni_data_retention_years Int      @default(5) @map("alumni_data_retention_years")
+  
+  updated_at                  DateTime @updatedAt @map("updated_at")
+
+  @@map("data_retention_policies")
+}
+
+// --- DSAR DELETION REQUESTS ---
+model DeletionRequest {
+  id                  String   @id @default(uuid()) @map("id")
+  school_id           String   @map("school_id")
+  school              School   @relation(fields: [school_id], references: [id])
+  
+  requested_by_id     String   @map("requested_by_id") // User ID of parent/admin
+  target_entity_type  String   @map("target_entity_type") // STUDENT, GUARDIAN, STAFF
+  target_entity_id    String   @map("target_entity_id")
+  
+  reason              String   @map("reason")
+  status              String   @default("PENDING") @map("status") // PENDING, APPROVED, COMPLETED, REJECTED
+  
+  processed_by_id     String?  @map("processed_by_id") // DPO or Admin who executed it
+  processed_at        DateTime? @map("processed_at")
+  
+  created_at          DateTime @default(now()) @map("created_at")
+
+  @@map("deletion_requests")
+}

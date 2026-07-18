@@ -1,0 +1,33 @@
+# .github/workflows/ci.yml
+name: SMIS CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint Backend
+        run: npm run lint --workspace=apps/api
+
+      - name: Typecheck Backend
+        run: npm run build --workspace=apps/api
+
+      - name: Lint Frontend
+        run: npm run lint --workspace=apps/web
+        
+      - name: Typecheck Frontend
+        run: npm run build --workspace=apps/web

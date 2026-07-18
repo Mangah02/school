@@ -1,0 +1,64 @@
+# ==========================
+# ENVIRONMENT & SECRETS (CRITICAL)
+# ==========================
+node_modules/
+.env
+.env.local
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+
+# ==========================
+# DEPENDENCIES
+# ==========================
+node_modules/
+.pnp
+.pnp.js
+
+# ==========================
+# PRISMA (ORM)
+# ==========================
+# Prisma generated client (must be regenerated on install)
+node_modules/.prisma/
+# Prisma migration history is kept, but local dev DB files are ignored
+*.db
+*.sqlite
+
+# ==========================
+# NESTJS (Backend)
+# ==========================
+dist/
+build/
+apps/api/dist/
+
+# ==========================
+# NEXT.JS (Frontend)
+# ==========================
+.next/
+out/
+apps/web/.next/
+
+# ==========================
+# DOCKER & VOLUMES
+# ==========================
+# Ignore local docker volume data to prevent pushing GBs of DB data
+postgres_data/
+minio_data/
+meili_data/
+
+# ==========================
+# OS & IDE FILES
+# ==========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==========================
+# TESTING & COVERAGE
+# ==========================
+coverage/
+.nyc_output/
