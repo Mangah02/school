@@ -1,5 +1,5 @@
 // apps/api/src/modules/attendance/biometric.service.ts
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EncryptionService } from '../../core/security/encryption.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -17,6 +17,7 @@ export class BiometricService {
    */
   async processBiometricAttendance(devicePayload: { student_admission_no: string, template_hash: string, timestamp: string }) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     // 1. Find student
     const student = await this.prisma.student.findFirst({
@@ -64,6 +65,8 @@ export class BiometricService {
    */
   async storeBiometricTemplate(studentId: string, rawTemplateData: string, consentRecordId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     const encryptedData = this.encryption.encrypt(rawTemplateData);
 
     return this.prisma.biometricTemplate.upsert({

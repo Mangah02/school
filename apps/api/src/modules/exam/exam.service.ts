@@ -1,5 +1,5 @@
 // apps/api/src/modules/exam/exam.service.ts
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EnterMarksDto } from './dto/enter-marks.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -10,6 +10,7 @@ export class ExamService {
 
   async enterMarks(dto: EnterMarksDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     // 1. Verify Exam exists and is not locked
     const exam = await this.prisma.exam.findFirst({
@@ -85,12 +86,15 @@ export class ExamService {
         });
       });
 
-      return tx.$transaction(operations);
+      // ✅ FIX: Use Promise.all to execute the array of promises within the transaction
+      return Promise.all(operations);
     });
   }
 
   async lockExam(examId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     return this.prisma.exam.update({
       where: { id: examId, school_id: context.schoolId },
       data: { is_locked: true }

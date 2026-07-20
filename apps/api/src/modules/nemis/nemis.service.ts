@@ -1,5 +1,5 @@
 // apps/api/src/modules/nemis/nemis.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -13,6 +13,7 @@ export class NemisService {
    */
   async generateStudentCsv() {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     const students = await this.prisma.student.findMany({
       where: { school_id: context.schoolId, is_deleted: false },

@@ -11,7 +11,8 @@ export class AnthropicProvider implements AiProvider {
   private readonly apiKey: string;
 
   constructor(private configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
+    // ✅ FIX: Provide a fallback empty string to satisfy TypeScript's strict null checks
+    this.apiKey = this.configService.get<string>('ANTHROPIC_API_KEY') || '';
   }
 
   async generateText(prompt: string, options?: AiPromptOptions): Promise<AiResponse> {
@@ -48,7 +49,7 @@ export class AnthropicProvider implements AiProvider {
         model: response.data.model,
         provider: this.name,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Anthropic API error: ${error.message}`);
       throw error;
     }

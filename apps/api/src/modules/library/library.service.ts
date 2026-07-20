@@ -1,5 +1,5 @@
 // apps/api/src/modules/library/library.service.ts
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,6 +9,7 @@ export class LibraryService {
 
   async borrowBook(bookId: string, studentId: string, dueDays: number) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     return this.prisma.$transaction(async (tx) => {
       const book = await tx.book.findFirst({
@@ -43,6 +44,8 @@ export class LibraryService {
 
   async returnBook(loanId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     const FINE_PER_DAY = 50; // KES 50 per day overdue
 
     return this.prisma.$transaction(async (tx) => {

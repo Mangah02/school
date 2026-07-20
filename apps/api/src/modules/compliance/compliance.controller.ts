@@ -1,5 +1,5 @@
 // apps/api/src/modules/compliance/compliance.controller.ts
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Req } from '@nestjs/common';
 import { DsarService } from './dsar.service';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { AuditEntity } from '../../core/decorators/audit-entity.decorator';
@@ -21,15 +21,16 @@ export class ComplianceController {
   @AuditEntity('DeletionRequest')
   async requestDeletion(
     @Body() body: { entity_type: string, entity_id: string, reason: string },
-    @Request() req
+    @Req() req: any // Using @Req() avoids the global 'Request' type collision
   ) {
+    // req.user is populated by the JwtAuthGuard
     return this.dsarService.requestDeletion(body.entity_type, body.entity_id, body.reason, req.user.id);
   }
 
   @Post('dsar/deletion/:id/execute')
   @Permissions('compliance:dsar:execute') // STRICTLY DPO / Principal
   @AuditEntity('DeletionRequest')
-  async executeDeletion(@Param('id') id: string, @Request() req) {
+  async executeDeletion(@Param('id') id: string, @Req() req: any) {
     return this.dsarService.processDeletion(id, req.user.id);
   }
 }

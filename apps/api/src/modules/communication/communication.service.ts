@@ -1,8 +1,11 @@
 // apps/api/src/modules/communication/communication.service.ts
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { Queue } from 'bull';
+
+// ✅ FIX: Use namespace import for Bull
+import * as Bull from 'bull'; 
 import { InjectQueue } from '@nestjs/bull';
+
 import { SendSmsDto } from './dto/send-sms.dto';
 import { SendEmailDto } from './dto/send-email.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -11,12 +14,17 @@ import { tenantStorage } from '../../core/tenant/tenant.context';
 export class CommunicationService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('sms-queue') private smsQueue: Queue,
-    @InjectQueue('email-queue') private emailQueue: Queue,
+    // ✅ FIX: Use Bull.Queue as the type annotation
+    @InjectQueue('sms-queue') private smsQueue: Bull.Queue,
+    @InjectQueue('email-queue') private emailQueue: Bull.Queue,
   ) {}
+
+  // ... (the rest of your dispatchSms, dispatchEmail, and resolveRecipients methods remain exactly the same)
 
   async dispatchSms(dto: SendSmsDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     const recipients = await this.resolveRecipients(dto.recipient_type, dto.recipient_ids, dto.class_id, 'SMS');
 
     if (recipients.length === 0) throw new BadRequestException('No valid recipients found');
@@ -41,6 +49,8 @@ export class CommunicationService {
 
   async dispatchEmail(dto: SendEmailDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     const recipients = await this.resolveRecipients(dto.recipient_type, dto.recipient_ids, dto.class_id, 'EMAIL');
 
     if (recipients.length === 0) throw new BadRequestException('No valid recipients found');
@@ -61,20 +71,23 @@ export class CommunicationService {
   }
 
   // Helper to fetch contacts based on type
-  private async resolveRecipients(type: string, ids: string[], classId: string, channel: string) {
+  // Updated signature to accept undefined for optional fields
+  private async resolveRecipients(type: string, ids: string[] | undefined, classId: string | undefined, channel: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     if (type === 'INDIVIDUAL') {
-      // Fetch from Guardians or Staff based on context (simplified here)
+      // Fallback to empty array if ids is undefined
+      const safeIds = ids || [];
       return this.prisma.guardian.findMany({
-        where: { id: { in: ids }, school_id: context.schoolId },
+        where: { id: { in: safeIds }, school_id: context.schoolId },
         select: { id: true, phone: true, email: true }
       });
     }
     
     if (type === 'CLASS') {
       const students = await this.prisma.student.findMany({
-        where: { stream: { class_id: classId }, school_id: context.schoolId, is_deleted: false },
+        where: { stream: { class_id: classId || '' }, school_id: context.schoolId, is_deleted: false },
         include: { guardians: { where: { guardian: { is_primary: true } }, include: { guardian: true } } }
       });
       return students.map(s => s.guardians[0]?.guardian).filter(g => g && (channel === 'SMS' ? g.phone : g.email));

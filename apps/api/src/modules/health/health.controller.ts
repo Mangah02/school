@@ -1,5 +1,5 @@
 // apps/api/src/modules/health/health.controller.ts
-import { Controller, Post, Body, Put, Param } from '@nestjs/common';
+import { Controller, Post, Body, Put, Param, Req } from '@nestjs/common'; // ✅ Import Req
 import { HealthService } from './health.service';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { AuditEntity } from '../../core/decorators/audit-entity.decorator';
@@ -17,7 +17,7 @@ export class HealthController {
   async upsertRecord(
     @Param('studentId') studentId: string, 
     @Body() body: { allergies: string, chronic_conditions: string, current_medications: string, consent_evidence_url?: string },
-    @Request() req
+    @Req() req: any // ✅ Use @Req() and type as any
   ) {
     return this.healthService.upsertMedicalRecord(studentId, body, req.user.id);
   }
@@ -27,7 +27,7 @@ export class HealthController {
   @AuditEntity('ClinicVisit')
   async logVisit(
     @Body() body: { student_id: string, symptoms: string, diagnosis?: string, treatment: string, nurse_notes?: string },
-    @Request() req
+    @Req() req: any // ✅ Use @Req() and type as any
   ) {
     return this.healthService.logClinicVisit(body.student_id, body, req.user.id);
   }

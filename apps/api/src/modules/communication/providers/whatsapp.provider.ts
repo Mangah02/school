@@ -20,9 +20,12 @@ export class WhatsAppProvider {
       throw new BadRequestException('CRITICAL: Unofficial WhatsApp (Baileys) is strictly forbidden in production. Use Meta Cloud API.');
     }
 
-    this.metaApiUrl = `https://graph.facebook.com/v18.0/${this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID')}/messages`;
-    this.metaAccessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN');
-    this.phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID');
+    // Provide fallback empty strings to satisfy TypeScript's strict null checks
+    const phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID') || '';
+    
+    this.metaApiUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+    this.metaAccessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN') || '';
+    this.phoneNumberId = phoneNumberId;
   }
 
   async sendWhatsAppMessage(to: string, message: string): Promise<string> {
@@ -55,7 +58,7 @@ export class WhatsAppProvider {
       );
 
       return response.data.messages[0].id;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Meta WhatsApp API failed for ${to}: ${error.message}`);
       throw error; // Triggers BullMQ retry
     }

@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/finance.controller.ts
-import { Controller, Post, Body, Get, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query, Req } from '@nestjs/common'; // ✅ Import Req
 import { FeeStructureService } from './fee-structure.service';
 import { InvoicingService } from './invoicing.service';
 import { CreateFeeStructureDto } from './dto/create-fee-structure.dto';
@@ -34,7 +34,7 @@ export class FinanceController {
   @Post('payments')
   @Permissions('finance:payment:record')
   @AuditEntity('Payment')
-  async recordPayment(@Body() dto: RecordPaymentDto, @Request() req) {
+  async recordPayment(@Body() dto: RecordPaymentDto, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.invoicingService.recordPayment(dto, req.user.id);
   }
 

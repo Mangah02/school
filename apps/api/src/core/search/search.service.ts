@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MeilisearchService } from './meilisearch.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { tenantStorage } from '../tenant/tenant.context';
+import { Prisma } from '@prisma/client'; 
 
 @Injectable()
 export class SearchService {
@@ -34,7 +35,7 @@ export class SearchService {
         total_results: students.estimatedTotalHits + staff.estimatedTotalHits + books.estimatedTotalHits,
         source: 'MEILISEARCH'
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`MeiliSearch failed, falling back to PostgreSQL FTS: ${error.message}`);
       return this.postgresFallbackSearch(context.schoolId, query);
     }
@@ -42,13 +43,14 @@ export class SearchService {
 
   private async postgresFallbackSearch(schoolId: string, query: string) {
     // PostgreSQL ILIKE fallback (or raw to_tsvector for true FTS)
+    // ✅ FIX: Use Prisma.QueryMode.insensitive instead of the plain string 'insensitive'
     const searchCondition = {
       OR: [
-        { first_name: { contains: query, mode: 'insensitive' } },
-        { last_name: { contains: query, mode: 'insensitive' } },
-        { admission_number: { contains: query, mode: 'insensitive' } },
-        { employee_id: { contains: query, mode: 'insensitive' } },
-        { title: { contains: query, mode: 'insensitive' } },
+        { first_name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        { last_name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        { admission_number: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        { employee_id: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        { title: { contains: query, mode: Prisma.QueryMode.insensitive } },
       ]
     };
 

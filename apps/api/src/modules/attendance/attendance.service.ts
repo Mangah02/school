@@ -1,5 +1,5 @@
 // apps/api/src/modules/attendance/attendance.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -12,6 +12,7 @@ export class AttendanceService {
 
   async markAttendance(dto: MarkAttendanceDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     const date = new Date(dto.date);
 
     // Bulk upsert for performance
@@ -51,7 +52,14 @@ export class AttendanceService {
    */
   async syncOfflineAttendance(payload: any[], userId: string) {
     const context = tenantStorage.getStore();
-    const results = { accepted: [], rejected: [], conflicts: [] };
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
+    // ✅ FIX: Explicitly type the arrays to prevent 'never[]' inference
+    const results = { 
+      accepted: [] as string[], 
+      rejected: [] as string[], 
+      conflicts: [] as { student_id: string; server_version: any }[] 
+    };
 
     for (const record of payload) {
       const existing = await this.prisma.attendanceRecord.findUnique({

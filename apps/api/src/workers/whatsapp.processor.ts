@@ -1,7 +1,7 @@
 // apps/api/src/workers/whatsapp.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../core/prisma/prisma.service';
 import { WhatsAppProvider } from '../modules/communication/providers/whatsapp.provider';
 
@@ -15,7 +15,7 @@ export class WhatsAppProcessor {
   ) {}
 
   @Process('send-whatsapp')
-  async handleWhatsApp(job: Job) {
+  async handleWhatsApp(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     const { school_id, recipient_id, recipient_contact, message } = job.data;
 
     const log = await this.prisma.messageLog.create({
@@ -40,7 +40,7 @@ export class WhatsAppProcessor {
       });
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       await this.prisma.messageLog.update({
         where: { id: log.id },
         data: { status: 'FAILED', error_message: error.message }

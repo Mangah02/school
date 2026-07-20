@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/mpesa.controller.ts
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Req } from '@nestjs/common'; // ✅ Import Req
 import { MpesaService } from './mpesa.service';
 import { InitiateStkPushDto } from './dto/initiate-stk-push.dto';
 import { MpesaCallbackDto } from './dto/mpesa-callback.dto';
@@ -16,7 +16,7 @@ export class MpesaController {
   @Post('stk-push')
   @Permissions('finance:payment:initiate')
   @AuditEntity('Payment')
-  async initiateStkPush(@Body() dto: InitiateStkPushDto, @Request() req) {
+  async initiateStkPush(@Body() dto: InitiateStkPushDto, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.mpesaService.initiateStkPush(dto, req.user.id);
   }
 

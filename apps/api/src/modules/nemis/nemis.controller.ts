@@ -2,8 +2,8 @@
 import { Controller, Get, Res, Header } from '@nestjs/common';
 import { NemisService } from './nemis.service';
 import { Permissions } from '../../core/guards/permissions.decorator';
-import { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express'; // ✅ FIX: Use 'import type' for Express Response
 
 @ApiTags('NEMIS Integration')
 @Controller('nemis')

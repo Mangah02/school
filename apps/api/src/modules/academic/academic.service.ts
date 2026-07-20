@@ -1,5 +1,5 @@
 // apps/api/src/modules/academic/academic.service.ts
-import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { AssignSubjectDto } from './dto/assign-subject.dto';
@@ -25,6 +25,7 @@ export class AcademicService {
 
   async assignSubjectToClass(dto: AssignSubjectDto) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     // Verify class and subject belong to this school
     const [classRecord, subjectRecord] = await Promise.all([
@@ -61,6 +62,8 @@ export class AcademicService {
 
   async getSubjectsForClass(classId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+
     return this.prisma.classSubject.findMany({
       where: { class_id: classId, class: { school_id: context.schoolId } },
       include: { subject: true },

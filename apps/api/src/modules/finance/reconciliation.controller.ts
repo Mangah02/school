@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/reconciliation.controller.ts
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Req } from '@nestjs/common'; // ✅ Import Req
 import { ReconciliationService } from './reconciliation.service';
 import { ManualConfirmPaymentDto, RejectPaymentDto } from './dto/reconciliation.dto';
 import { Permissions } from '../../core/guards/permissions.decorator';
@@ -20,14 +20,14 @@ export class ReconciliationController {
   @Post('confirm')
   @Permissions('finance:reconciliation:confirm')
   @AuditEntity('Payment')
-  async confirm(@Body() dto: ManualConfirmPaymentDto, @Request() req) {
+  async confirm(@Body() dto: ManualConfirmPaymentDto, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.reconciliationService.manualConfirm(dto, req.user.id);
   }
 
   @Post('reject')
   @Permissions('finance:reconciliation:confirm')
   @AuditEntity('Payment')
-  async reject(@Body() dto: RejectPaymentDto, @Request() req) {
+  async reject(@Body() dto: RejectPaymentDto, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.reconciliationService.rejectPayment(dto, req.user.id);
   }
 

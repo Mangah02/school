@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/invoicing.service.ts
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { GenerateInvoicesDto } from './dto/generate-invoices.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
@@ -18,6 +18,8 @@ export class InvoicingService {
    */
   async generateClassInvoices(dto: GenerateInvoicesDto) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Guard added
+    
     const dueDate = new Date(dto.due_date);
 
     // 1. Fetch Fee Structure and Students
@@ -35,7 +37,8 @@ export class InvoicingService {
 
     // 2. Generate Invoices and Journal Entries in a single transaction
     return this.prisma.$transaction(async (tx) => {
-      const createdInvoices = [];
+      // ✅ FIX: Explicitly type the array to prevent 'never[]' inference
+      const createdInvoices: any[] = []; 
 
       for (const student of students) {
         // Check if invoice already exists to prevent duplicates
@@ -92,6 +95,7 @@ export class InvoicingService {
    */
   async recordPayment(dto: RecordPaymentDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Guard added
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: dto.invoice_id, school_id: context.schoolId, status: { not: 'VOID' } }
@@ -122,7 +126,8 @@ export class InvoicingService {
           method: dto.method,
           reference: dto.reference,
           status: 'SUCCESS',
-          mpesa_state: dto.method === 'MPESA' ? 'SUCCESS' : null
+          // ✅ FIX: Use undefined instead of null for optional Prisma string fields
+          mpesa_state: dto.method === 'MPESA' ? 'SUCCESS' : undefined 
         }
       });
 
@@ -161,6 +166,8 @@ export class InvoicingService {
    */
   async allocateUnallocatedPayment(studentId: string, totalAmount: number, method: string, reference: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Guard added
+    
     let remainingAmount = totalAmount;
 
     // Fetch oldest unpaid/partial invoices first (FIFO)

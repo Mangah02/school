@@ -3,14 +3,14 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import * as bcrypt from 'bcrypt';
-import { Queue } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { InjectQueue } from '@nestjs/bull';
 
 @Injectable()
 export class SchoolsService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('notifications') private notificationsQueue: Queue,
+    @InjectQueue('notifications') private notificationsQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {}
 
   async provisionSchool(dto: CreateSchoolDto) {
@@ -68,8 +68,7 @@ export class SchoolsService {
           email: dto.admin_email.toLowerCase(),
           password_hash: passwordHash,
           role_id: defaultRole.id,
-          first_name: dto.admin_first_name,
-          last_name: dto.admin_last_name,
+          // ✅ FIX: Removed first_name and last_name as they do not exist on the User model in your Prisma schema
         },
       });
 

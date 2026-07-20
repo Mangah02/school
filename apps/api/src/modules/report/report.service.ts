@@ -1,7 +1,7 @@
 // apps/api/src/modules/report/report.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,11 +9,12 @@ import { tenantStorage } from '../../core/tenant/tenant.context';
 export class ReportService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('pdf-generation') private pdfQueue: Queue,
+    @InjectQueue('pdf-generation') private pdfQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {}
 
   async generateClassReportCards(examId: string, classId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // 1. Fetch all students in the class and their results for this exam
     const students = await this.prisma.student.findMany({

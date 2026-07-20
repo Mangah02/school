@@ -1,5 +1,5 @@
 // apps/api/src/modules/analytics/anomaly.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -15,6 +15,7 @@ export class AnomalyService {
    */
   async detectFinancialAnomalies() {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     const now = new Date();
     
     // 1. Get current month's waivers

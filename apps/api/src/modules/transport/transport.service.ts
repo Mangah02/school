@@ -1,7 +1,7 @@
 // apps/api/src/modules/transport/transport.service.ts
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { Queue } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { InjectQueue } from '@nestjs/bull';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,11 +9,12 @@ import { tenantStorage } from '../../core/tenant/tenant.context';
 export class TransportService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('sms-queue') private smsQueue: Queue,
+    @InjectQueue('sms-queue') private smsQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {}
 
   async assignStudentToRoute(studentId: string, routeId: string, pickup: string, dropoff: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // Verify route capacity
     const route = await this.prisma.transportRoute.findFirst({
@@ -36,7 +37,7 @@ export class TransportService {
           status: 'ACTIVE'
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'P2002') throw new ConflictException('Student is already assigned to this route');
       throw error;
     }
@@ -47,6 +48,7 @@ export class TransportService {
    */
   async recordBusDelay(routeId: string, delayMinutes: number, reason: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const route = await this.prisma.transportRoute.findFirst({
       where: { id: routeId, school_id: context.schoolId },
@@ -59,7 +61,9 @@ export class TransportService {
     });
     if (!route) throw new BadRequestException('Route not found');
 
-    const notifications = [];
+    // ✅ FIX: Explicitly type the array to prevent 'never[]' inference
+    const notifications: Promise<any>[] = [];
+    
     for (const assignment of route.assignments) {
       const primaryGuardian = assignment.student.guardians.find(g => g.guardian.is_primary)?.guardian;
       if (primaryGuardian && primaryGuardian.phone) {

@@ -1,5 +1,5 @@
 // apps/api/src/modules/communication/communication.controller.ts
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { CommunicationService } from './communication.service';
 import { SendSmsDto } from './dto/send-sms.dto';
 import { SendEmailDto } from './dto/send-email.dto';
@@ -20,14 +20,14 @@ export class CommunicationController {
   @Post('sms')
   @Permissions('communication:sms:send')
   @AuditEntity('MessageLog')
-  async sendSms(@Body() dto: SendSmsDto, @Request() req) {
+  async sendSms(@Body() dto: SendSmsDto, @Req() req: any) {
     return this.communicationService.dispatchSms(dto, req.user.id);
   }
 
   @Post('email')
   @Permissions('communication:email:send')
   @AuditEntity('MessageLog')
-  async sendEmail(@Body() dto: SendEmailDto, @Request() req) {
+  async sendEmail(@Body() dto: SendEmailDto, @Req() req: any) {
     return this.communicationService.dispatchEmail(dto, req.user.id);
   }
 
@@ -35,6 +35,8 @@ export class CommunicationController {
   @Permissions('communication:logs:view')
   async getLogs(@Query('channel') channel: string, @Query('status') status: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     return this.prisma.messageLog.findMany({
       where: {
         school_id: context.schoolId,

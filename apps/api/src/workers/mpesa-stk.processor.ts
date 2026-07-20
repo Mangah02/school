@@ -1,7 +1,7 @@
 // apps/api/src/workers/mpesa-stk.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../core/prisma/prisma.service';
 
 @Processor('mpesa-stk')
@@ -15,7 +15,7 @@ export class MpesaStkProcessor {
    * Configured with 5-level backoff: 30s, 2m, 10m, 1hr, 6hr.
    */
   @Process('check-timeout')
-  async handleTimeoutCheck(job: Job) {
+  async handleTimeoutCheck(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     const { payment_id } = job.data;
     
     const payment = await this.prisma.payment.findUnique({ where: { id: payment_id } });

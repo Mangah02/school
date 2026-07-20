@@ -4,7 +4,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { AiProvider, AiPromptOptions, AiResponse } from './interfaces/ai-provider.interface';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { OllamaProvider } from './providers/ollama.provider';
-import { PiiStripperService } from './pii-stripper.service';
+import { PiiStripperService } from './providers/pii-stripper.service'; // ✅ FIXED PATH
 import { AiQuotaService } from './ai-quota.service'; // <-- Added for Milestone 8.6
 import { tenantStorage } from '../../core/tenant/tenant.context';
 

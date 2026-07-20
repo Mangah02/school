@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/hr.service.ts
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EncryptionService } from '../../core/security/encryption.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -14,6 +14,7 @@ export class HrService {
 
   async createStaff(dto: CreateStaffDto, creatorUserId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // SRS 18.1: TSC number is ONLY applicable if the linked User's role is 'teacher'
     const user = await this.prisma.user.findUnique({ where: { id: dto.user_id }, include: { role: true } });
@@ -61,7 +62,7 @@ export class HrService {
           date_joined: new Date(dto.date_joined),
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'P2002') throw new ConflictException('Employee ID or User already linked');
       throw error;
     }
@@ -69,6 +70,8 @@ export class HrService {
 
   async getStaffProfile(staffId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, school_id: context.schoolId, is_deleted: false },
       include: { user: { select: { email: true, role: true } } }

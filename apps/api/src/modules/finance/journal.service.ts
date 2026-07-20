@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/journal.service.ts
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { ReverseTransactionDto } from './dto/journal-correction.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -18,6 +18,7 @@ export class JournalService {
    */
   async reverseTransaction(dto: ReverseTransactionDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // 1. Fetch original entries
     const originalEntries = await this.prisma.journalEntry.findMany({

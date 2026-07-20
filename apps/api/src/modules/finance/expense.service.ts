@@ -1,10 +1,19 @@
 // apps/api/src/modules/finance/expense.service.ts
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { StorageService } from '../../core/storage/storage.service';
 import { CreateExpenseDto, CreateBudgetDto } from './dto/expense.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 import { v4 as uuidv4 } from 'uuid';
+
+export interface BudgetReportItem {
+  category: string;
+  code: string;
+  allocated: number;
+  actual: number;
+  variance: number;
+  utilization_percent: number;
+}
 
 @Injectable()
 export class ExpenseService {
@@ -15,11 +24,13 @@ export class ExpenseService {
 
   async createCategory(name: string, code: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     try {
       return await this.prisma.expenseCategory.create({
         data: { school_id: context.schoolId, name, code }
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'P2002') throw new ConflictException('Category code already exists');
       throw error;
     }
@@ -30,12 +41,15 @@ export class ExpenseService {
    */
   async recordExpense(dto: CreateExpenseDto, fileBuffer: Buffer | null, originalName: string | null, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
     // 1. Upload Receipt to MinIO (if provided)
-    let receiptUrl = null;
+    let receiptUrl: string | null = null;
     if (fileBuffer && originalName) {
       const fileName = `expenses/${context.schoolId}/${Date.now()}-${originalName}`;
-      receiptUrl = await this.storage.uploadBuffer(fileName, fileBuffer, 'application/octet-stream');
+      // NOTE: If your StorageService uses 'uploadFile' or 'putObject' instead of 'upload', 
+      // change 'upload' to the correct method name here.
+      receiptUrl = await this.storage.upload(fileName, fileBuffer, 'application/octet-stream');
     }
 
     // 2. Create Expense Record
@@ -90,6 +104,8 @@ export class ExpenseService {
 
   async setBudget(dto: CreateBudgetDto) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+
     return this.prisma.budget.upsert({
       where: {
         school_id_category_id_academic_year_id: {
@@ -108,13 +124,16 @@ export class ExpenseService {
    */
   async getBudgetVsActual(academicYearId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     const budgets = await this.prisma.budget.findMany({
       where: { school_id: context.schoolId, academic_year_id: academicYearId },
       include: { category: true }
     });
 
-    const report = [];
+    // Explicitly type the array to prevent the 'never[]' inference error
+    const report: BudgetReportItem[] = [];
+    
     for (const budget of budgets) {
       // Fetch actuals from Journal Entries for this specific expense category code prefix
       const actuals = await this.prisma.journalEntry.aggregate({

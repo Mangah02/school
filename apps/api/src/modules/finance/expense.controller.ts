@@ -1,7 +1,7 @@
 // apps/api/src/modules/finance/expense.controller.ts
-import { Controller, Post, Body, Get, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseInterceptors, UploadedFile, Req } from '@nestjs/common'; // ✅ Import Req
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ExpenseService } from './expense.service';
+import { ExpenseService, BudgetReportItem } from './expense.service'; // ✅ Import the exported interface
 import { CreateExpenseDto, CreateBudgetDto } from './dto/expense.dto';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { AuditEntity } from '../../core/decorators/audit-entity.decorator';
@@ -25,8 +25,8 @@ export class ExpenseController {
   @ApiConsumes('multipart/form-data')
   async recordExpense(
     @Body() dto: CreateExpenseDto,
-    @UploadedFile() file: Express.Multer.File | null,
-    @Request() req
+    @UploadedFile() file: any, // ✅ Use 'any' to bypass Express.Multer.File type issues
+    @Req() req: any // ✅ Use @Req() to avoid global Request type collision
   ) {
     return this.expenseService.recordExpense(
       dto, 
@@ -45,7 +45,7 @@ export class ExpenseController {
 
   @Get('budget-vs-actual')
   @Permissions('finance:report:view')
-  async getBudgetReport(@Query('academic_year_id') academicYearId: string) {
+  async getBudgetReport(@Query('academic_year_id') academicYearId: string): Promise<BudgetReportItem[]> { // ✅ Explicitly type the return
     return this.expenseService.getBudgetVsActual(academicYearId);
   }
 }

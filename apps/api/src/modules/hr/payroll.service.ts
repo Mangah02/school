@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/payroll.service.ts
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,6 +14,7 @@ export class PayrollService {
    */
   async processMonthlyPayroll(month: number, year: number) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const staffList = await this.prisma.staff.findMany({
       where: { school_id: context.schoolId, is_deleted: false }

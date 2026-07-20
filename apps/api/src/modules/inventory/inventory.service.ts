@@ -1,5 +1,5 @@
 // apps/api/src/modules/inventory/inventory.service.ts
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,6 +9,7 @@ export class InventoryService {
 
   async createRequisition(itemId: string, quantity: number, justification: string, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const item = await this.prisma.inventoryItem.findFirst({
       where: { id: itemId, school_id: context.schoolId, is_deleted: false }
@@ -29,6 +30,7 @@ export class InventoryService {
 
   async approveRequisitionAndCreatePO(requisitionId: string, supplierId: string, unitCost: number, approverId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     return this.prisma.$transaction(async (tx) => {
       const req = await tx.requisition.findFirst({
@@ -79,6 +81,7 @@ export class InventoryService {
    */
   async receivePurchaseOrder(poId: string, receivedItems: { po_item_id: string, received_qty: number }[]) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     return this.prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.findFirst({

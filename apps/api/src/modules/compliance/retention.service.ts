@@ -24,7 +24,8 @@ export class RetentionService {
     });
 
     for (const school of schools) {
-      const policy = school.retentionPolicy || { soft_delete_purge_days: 90 };
+      // ✅ FIX 1: Add audit_log_retention_years to the fallback object
+      const policy = school.retentionPolicy || { soft_delete_purge_days: 90, audit_log_retention_years: 5 };
       const purgeDate = new Date();
       purgeDate.setDate(purgeDate.getDate() - policy.soft_delete_purge_days);
       
@@ -39,7 +40,9 @@ export class RetentionService {
 
       // 3. Purge old Audit Logs (based on retention years)
       const auditPurgeDate = new Date();
-      auditPurgeDate.setFullYear(auditPurgeDate.getFullYear() - policy.audit_log_retention_years);
+      // ✅ FIX 1b: Provide fallback just in case
+      const retentionYears = policy.audit_log_retention_years || 5;
+      auditPurgeDate.setFullYear(auditPurgeDate.getFullYear() - retentionYears);
       await this.purgeOldAuditLogs(school.id, auditPurgeDate);
     }
   }
@@ -82,9 +85,9 @@ export class RetentionService {
           first_name: 'ANONYMIZED',
           last_name: 'ANONYMIZED',
           admission_number: `DEL_${student.id.slice(0, 8)}`,
-          // Clear other PII
-          nationality: null,
-          blood_group: null,
+          // ✅ FIX 2: Changed from null to 'ANONYMIZED' to satisfy Prisma schema (required String)
+          nationality: 'ANONYMIZED',
+          blood_group: null,         // These are String? in schema, so null is valid
           medical_condition: null,
         }
       });

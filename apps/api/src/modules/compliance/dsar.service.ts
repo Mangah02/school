@@ -1,5 +1,5 @@
 // apps/api/src/modules/compliance/dsar.service.ts
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -12,6 +12,7 @@ export class DsarService {
    */
   async exportData(entityType: string, entityId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
     if (entityType === 'STUDENT') {
       const student = await this.prisma.student.findFirst({
@@ -49,6 +50,7 @@ export class DsarService {
    */
   async requestDeletion(entityType: string, entityId: string, reason: string, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
     // Verify entity exists
     let entityExists = false;
@@ -77,6 +79,7 @@ export class DsarService {
    */
   async processDeletion(requestId: string, dpoUserId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
     const request = await this.prisma.deletionRequest.findFirst({
       where: { id: requestId, school_id: context.schoolId, status: 'PENDING' }
@@ -92,8 +95,8 @@ export class DsarService {
             first_name: 'ANONYMIZED',
             last_name: 'ANONYMIZED',
             admission_number: `DEL_${request.target_entity_id.slice(0, 8)}`,
-            nationality: null,
-            blood_group: null,
+            nationality: 'ANONYMIZED', // Changed from null to string to satisfy Prisma schema
+            blood_group: null,         // These are String? in schema, so null is valid
             medical_condition: null,
             photo_url: null,
             is_deleted: true,
@@ -104,7 +107,11 @@ export class DsarService {
         // Also anonymize medical records
         await tx.medicalRecord.updateMany({
           where: { student_id: request.target_entity_id },
-          data: { allergies: 'ANONYMIZED', chronic_conditions: 'ANONYMIZED', current_medications: 'ANONYMIZED' }
+          data: { 
+            allergies: 'ANONYMIZED', 
+            chronic_conditions: 'ANONYMIZED', 
+            current_medications: 'ANONYMIZED' 
+          }
         });
       } 
       else if (request.target_entity_type === 'GUARDIAN') {

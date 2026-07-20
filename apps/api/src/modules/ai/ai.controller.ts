@@ -1,5 +1,5 @@
 // apps/api/src/modules/ai/ai.controller.ts 
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { AiQuotaService } from './ai-quota.service';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { ApiTags } from '@nestjs/swagger';
@@ -14,6 +14,8 @@ export class AiController {
   @Permissions('ai:quota:view') // Only Admin/DPO can view AI spend
   async getQuotaStatus() {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     // Mock an estimated cost of 0 just to check current state
     const result = await this.quotaService.checkAndEnforceQuota(context.schoolId, 0);
     return {

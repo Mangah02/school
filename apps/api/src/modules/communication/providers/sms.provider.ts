@@ -10,7 +10,8 @@ export class SmsProvider {
   private readonly senderName: string;
 
   constructor(private configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('AT_API_KEY');
+    // Provide fallback empty string to satisfy TypeScript's strict null checks
+    this.apiKey = this.configService.get<string>('AT_API_KEY') || '';
     this.senderName = this.configService.get<string>('AT_SENDER_NAME') || 'SMIS';
   }
 
@@ -40,7 +41,7 @@ export class SmsProvider {
       } else {
         throw new Error(`AT API Error: ${result.status}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to send SMS to ${to}: ${error.message}`);
       throw error; // Throw to trigger BullMQ retry
     }

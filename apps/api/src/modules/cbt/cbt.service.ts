@@ -1,19 +1,20 @@
 // apps/api/src/modules/cbt/cbt.service.ts
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
-import { Queue } from 'bull';
+import * as Bull from 'bull';
 import { InjectQueue } from '@nestjs/bull';
 
 @Injectable()
 export class CbtService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('ai-grading') private aiGradingQueue: Queue,
+    @InjectQueue('ai-grading') private aiGradingQueue: Bull.Queue,
   ) {}
 
   async startExam(examId: string, studentId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     const exam = await this.prisma.cBTExam.findFirst({
       where: { id: examId, school_id: context.schoolId, is_active: true }
@@ -49,6 +50,7 @@ export class CbtService {
    */
   async saveAnswer(sessionId: string, questionId: string, studentAnswer: string, clientUpdatedAt: Date) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     // Verify session belongs to this school and is ACTIVE
     const session = await this.prisma.cBTSession.findFirst({
@@ -58,6 +60,10 @@ export class CbtService {
 
     // REQ-CBT-011: Check if 10 mins have passed since exam end_time
     const exam = await this.prisma.cBTExam.findUnique({ where: { id: session.exam_id } });
+    
+    // ✅ FIX: Check if exam is null before accessing end_time
+    if (!exam) throw new BadRequestException('Exam not found for this session');
+    
     const timeSinceEnd = Date.now() - exam.end_time.getTime();
     if (timeSinceEnd > 10 * 60 * 1000) {
       await this.forceSubmitExam(sessionId);
@@ -86,6 +92,7 @@ export class CbtService {
    */
   async submitExam(sessionId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     const session = await this.prisma.cBTSession.findFirst({
       where: { id: sessionId, exam: { school_id: context.schoolId } },
@@ -128,6 +135,7 @@ export class CbtService {
    */
   async logProctoringEvent(sessionId: string, eventType: string, details: any) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
     
     const session = await this.prisma.cBTSession.findFirst({
       where: { id: sessionId, exam: { school_id: context.schoolId } }

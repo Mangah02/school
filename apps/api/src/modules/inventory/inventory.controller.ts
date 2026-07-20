@@ -1,5 +1,5 @@
 // apps/api/src/modules/inventory/inventory.controller.ts
-import { Controller, Post, Body, Param } from '@nestjs/common';
+import { Controller, Post, Body, Param, Req } from '@nestjs/common'; // ✅ Import Req
 import { InventoryService } from './inventory.service';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { AuditEntity } from '../../core/decorators/audit-entity.decorator';
@@ -13,14 +13,14 @@ export class InventoryController {
   @Post('requisitions')
   @Permissions('inventory:requisition:create')
   @AuditEntity('Requisition')
-  async createReq(@Body() body: { item_id: string, quantity: number, justification: string }, @Request() req) {
+  async createReq(@Body() body: { item_id: string, quantity: number, justification: string }, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.inventoryService.createRequisition(body.item_id, body.quantity, body.justification, req.user.id);
   }
 
   @Post('requisitions/:id/approve')
   @Permissions('inventory:requisition:approve') // Finance/Admin only
   @AuditEntity('Requisition')
-  async approveReq(@Param('id') id: string, @Body() body: { supplier_id: string, unit_cost: number }, @Request() req) {
+  async approveReq(@Param('id') id: string, @Body() body: { supplier_id: string, unit_cost: number }, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.inventoryService.approveRequisitionAndCreatePO(id, body.supplier_id, body.unit_cost, req.user.id);
   }
 

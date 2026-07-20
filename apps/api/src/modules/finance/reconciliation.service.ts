@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/reconciliation.service.ts
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { ManualConfirmPaymentDto, RejectPaymentDto } from './dto/reconciliation.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -13,6 +13,8 @@ export class ReconciliationService {
 
   async getReconcilingPayments() {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+
     return this.prisma.payment.findMany({
       where: { school_id: context.schoolId, mpesa_state: 'RECONCILING' },
       include: { invoice: { include: { student: true } } },
@@ -25,6 +27,7 @@ export class ReconciliationService {
    */
   async manualConfirm(dto: ManualConfirmPaymentDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const payment = await this.prisma.payment.findFirst({
       where: { id: dto.payment_id, school_id: context.schoolId, mpesa_state: 'RECONCILING' },
@@ -83,6 +86,7 @@ export class ReconciliationService {
 
   async rejectPayment(dto: RejectPaymentDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     await this.prisma.payment.update({
       where: { id: dto.payment_id, school_id: context.schoolId, mpesa_state: 'RECONCILING' },
@@ -101,6 +105,8 @@ export class ReconciliationService {
    */
   async generateDailyReport(date: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+
     const startDate = new Date(date);
     const endDate = new Date(date);
     endDate.setDate(endDate.getDate() + 1);

@@ -1,10 +1,9 @@
 // apps/api/src/workers/sms.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SmsProvider } from '../modules/communication/providers/sms.provider';
-import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
 
 @Processor('sms-queue')
@@ -14,11 +13,11 @@ export class SmsProcessor {
   constructor(
     private prisma: PrismaService,
     private smsProvider: SmsProvider,
-    @InjectQueue('email-queue') private emailQueue: Queue,
+    @InjectQueue('email-queue') private emailQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {}
 
   @Process('send-sms')
-  async handleSms(job: Job) {
+  async handleSms(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     const { school_id, recipient_id, recipient_contact, message, requested_by } = job.data;
 
     // 1. Create or Update Message Log
@@ -47,7 +46,7 @@ export class SmsProcessor {
       this.logger.log(`SMS sent successfully to ${recipient_contact}`);
       return { success: true };
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`SMS attempt ${job.attemptsMade + 1} failed for ${recipient_contact}: ${error.message}`);
       
       await this.prisma.messageLog.update({
@@ -60,7 +59,8 @@ export class SmsProcessor {
 
       // 3. FALLBACK LOGIC (Risk R-010)
       // If this is the FINAL attempt (Bull counts attempts starting from 0, so opts.attempts - 1 is the last one)
-      if (job.attemptsMade >= job.opts.attempts - 1) {
+      // ✅ FIX: Added fallback '|| 1' to handle undefined attempts
+      if (job.attemptsMade >= (job.opts.attempts || 1) - 1) {
         this.logger.error(`SMS permanently failed for ${recipient_contact}. Triggering EMAIL fallback.`);
         
         await this.prisma.messageLog.update({

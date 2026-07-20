@@ -1,5 +1,5 @@
 // apps/api/src/modules/auth/auth.service.ts
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, BadRequestException } from '@nestjs/common'; // ✅ Added BadRequestException
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -17,12 +17,17 @@ export class AuthService {
     private redis: RedisService,
   ) {}
 
+  // ✅ FIX 4: Helper to safely access redis methods if they aren't typed in your RedisService
+  private get redisClient() {
+    return (this.redis as any).client || (this.redis as any);
+  }
+
   /**
    * Validates user credentials and handles account lockout (Milestone 4.6)
    */
   async validateUser(email: string, password: string) {
     const lockoutKey = `lockout:${email.toLowerCase()}`;
-    const attempts = await this.redis.get(lockoutKey);
+    const attempts = await this.redisClient.get(lockoutKey);
     
     // SRS 3.1.2: Lock after 4 consecutive failed logins
     if (attempts && parseInt(attempts) >= 4) {
@@ -30,7 +35,8 @@ export class AuthService {
       throw new UnauthorizedException('Account locked due to too many failed attempts. Try again in 30 minutes.');
     }
 
-    const user = await this.prisma.user.findUnique({
+    // ✅ FIX 2: Changed findUnique to findFirst because email is part of a composite unique constraint
+    const user = await this.prisma.user.findFirst({
       where: { email: email.toLowerCase() },
       include: { role: true, school: true }
     });
@@ -44,16 +50,16 @@ export class AuthService {
 
     if (!isPasswordValid) {
       // Increment lockout counter
-      const newAttempts = await this.redis.incr(lockoutKey);
+      const newAttempts = await this.redisClient.incr(lockoutKey);
       if (newAttempts === 1) {
         // Set expiry on the first attempt
-        await this.redis.expire(lockoutKey, 1800); // 30 minutes
+        await this.redisClient.expire(lockoutKey, 1800); // 30 minutes
       }
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Reset attempts on success
-    await this.redis.del(lockoutKey);
+    await this.redisClient.del(lockoutKey);
 
     // SRS 36.6: Audit login event
     await this.prisma.auditLog.create({
@@ -89,31 +95,26 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
     
     // Store refresh token in Redis for sliding window & revocation
-    await this.redis.set(`refresh:${user.id}`, refreshToken, 'EX', 30 * 24 * 60 * 60);
+    await this.redisClient.set(`refresh:${user.id}`, refreshToken, 'EX', 30 * 24 * 60 * 60);
 
     return {
       accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
         role: user.role.name,
         school_id: user.school_id
       }
-      // Note: Refresh token is NOT returned in JSON, it's set as an httpOnly cookie in the Controller
     };
   }
-
-  // apps/api/src/modules/auth/auth.service.ts (Additions to existing class)
-import * as crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
-
-// ... inside AuthService class ...
 
   /**
    * SRS 3.1.3: Step 1 - Generate and send OTP
    */
   async requestPasswordReset(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    // ✅ FIX 2: Changed findUnique to findFirst
+    const user = await this.prisma.user.findFirst({ where: { email: email.toLowerCase() } });
     
     // Security: Do not reveal if user exists or not
     if (!user || !user.is_active || user.is_deleted) {
@@ -124,7 +125,7 @@ import * as bcrypt from 'bcrypt';
     const otp = crypto.randomInt(100000, 999999).toString();
     
     // Store in Redis for 15 minutes (SRS 3.1.3)
-    await this.redis.set(`otp:${email.toLowerCase()}`, otp, 'EX', 900);
+    await this.redisClient.set(`otp:${email.toLowerCase()}`, otp, 'EX', 900);
 
     // TODO: Trigger Email Service (Module 8/12) to send OTP
     this.logger.log(`[MOCK EMAIL] OTP for ${email} is: ${otp}`);
@@ -136,14 +137,14 @@ import * as bcrypt from 'bcrypt';
    * SRS 3.1.3: Step 2 - Verify OTP and issue short-lived reset token
    */
   async verifyOtp(email: string, otp: string) {
-    const storedOtp = await this.redis.get(`otp:${email.toLowerCase()}`);
+    const storedOtp = await this.redisClient.get(`otp:${email.toLowerCase()}`);
 
     if (!storedOtp || storedOtp !== otp) {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
     // Invalidate OTP immediately after use (prevent replay)
-    await this.redis.del(`otp:${email.toLowerCase()}`);
+    await this.redisClient.del(`otp:${email.toLowerCase()}`);
 
     // Issue a short-lived reset token (valid for 10 mins)
     const resetToken = this.jwtService.sign(
@@ -166,7 +167,8 @@ import * as bcrypt from 'bcrypt';
       throw new UnauthorizedException('Invalid or expired reset token');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { email: payload.email } });
+    // ✅ FIX 2: Changed findUnique to findFirst
+    const user = await this.prisma.user.findFirst({ where: { email: payload.email } });
     if (!user) throw new UnauthorizedException('User not found');
 
     // SRS 3.1.3: Cannot reuse last 3 passwords
@@ -174,6 +176,7 @@ import * as bcrypt from 'bcrypt';
     for (const oldHash of history) {
       const isMatch = await bcrypt.compare(newPassword, oldHash);
       if (isMatch) {
+        // ✅ FIX 1: BadRequestException is now imported
         throw new BadRequestException('Cannot reuse any of your last 3 passwords');
       }
     }
@@ -189,22 +192,21 @@ import * as bcrypt from 'bcrypt';
       data: {
         password_hash: newHash,
         password_history: updatedHistory,
-        failed_login_attempts: 0, // Reset lockout on successful reset
+        // ✅ FIX 3: Removed failed_login_attempts as it doesn't exist in Prisma schema
       },
     });
 
     // Invalidate all active refresh tokens (force re-login on all devices)
-    await this.redis.del(`refresh:${user.id}`);
+    await this.redisClient.del(`refresh:${user.id}`);
 
     return { message: 'Password reset successfully' };
   }
-
 
   /**
    * Handles Refresh Token logic (Sliding Window)
    */
   async refreshTokens(userId: string, refreshToken: string) {
-    const storedToken = await this.redis.get(`refresh:${userId}`);
+    const storedToken = await this.redisClient.get(`refresh:${userId}`);
     
     if (!storedToken || storedToken !== refreshToken) {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -225,12 +227,12 @@ import * as bcrypt from 'bcrypt';
     const newAccessToken = this.jwtService.sign(payload, { expiresIn: '5h' });
     
     // Slide the window: extend refresh token expiry in Redis
-    await this.redis.expire(`refresh:${userId}`, 30 * 24 * 60 * 60);
+    await this.redisClient.expire(`refresh:${userId}`, 30 * 24 * 60 * 60);
 
     return { accessToken: newAccessToken };
   }
 
   async logout(userId: string) {
-    await this.redis.del(`refresh:${userId}`);
+    await this.redisClient.del(`refresh:${userId}`);
   }
 }

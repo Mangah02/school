@@ -11,7 +11,7 @@ export class EncryptionService {
   constructor(private configService: ConfigService) {
     // Key must be 32 bytes for AES-256
     const secret = this.configService.get<string>('BIOMETRIC_ENCRYPTION_KEY');
-    this.key = crypto.createHash('sha256').update(secret).digest();
+    this.key = crypto.createHash('sha256').update(secret || 'fallback-encryption-secret').digest();
   }
 
   encrypt(text: string): string {

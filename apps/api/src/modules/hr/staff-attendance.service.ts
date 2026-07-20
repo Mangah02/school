@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/staff-attendance.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,6 +9,8 @@ export class StaffAttendanceService {
 
   async markAttendance(staffId: string, date: string, status: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     const attendanceDate = new Date(date);
 
     return this.prisma.staffAttendance.upsert({
@@ -26,6 +28,8 @@ export class StaffAttendanceService {
 
   async getStaffAttendanceReport(month: number, year: number) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 

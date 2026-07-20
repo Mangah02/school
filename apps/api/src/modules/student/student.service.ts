@@ -1,8 +1,9 @@
 // apps/api/src/modules/student/students.service.ts
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common'; // ✅ Added NotFoundException, UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AdmitStudentDto } from './dto/admit-student.dto';
-import { Queue } from 'bull';
+import { PromoteStudentDto } from './dto/promote-student.dto'; // ✅ Added missing import
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { InjectQueue } from '@nestjs/bull';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -10,18 +11,21 @@ import { tenantStorage } from '../../core/tenant/tenant.context';
 export class StudentsService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('notifications') private notificationsQueue: Queue,
+    @InjectQueue('notifications') private notificationsQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {}
 
   async admitStudent(dto: AdmitStudentDto) {
     const context = tenantStorage.getStore();
-    if (!context?.schoolId) throw new BadRequestException('Tenant context missing');
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // 1. Generate Admission Number (Format: KMS_CODE/YYYY/####)
-    // For simplicity, we use a sequential count + 1. In production, use a DB sequence or Redis INCR.
     const studentCount = await this.prisma.student.count({ where: { school_id: context.schoolId } });
     const school = await this.prisma.school.findUnique({ where: { id: context.schoolId } });
-    const prefix = school?.kms_code || 'SCH';
+    
+    // ✅ FIX: Check if school is null
+    if (!school) throw new BadRequestException('School not found');
+    
+    const prefix = school.kms_code || 'SCH';
     const year = new Date().getFullYear();
     const admissionNumber = `${prefix}/${year}/${String(studentCount + 1).padStart(4, '0')}`;
 
@@ -95,6 +99,7 @@ export class StudentsService {
 
   async promoteStudent(dto: PromoteStudentDto) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // 1. Fetch student and target class
     const student = await this.prisma.student.findFirst({
@@ -116,7 +121,7 @@ export class StudentsService {
       throw new BadRequestException('CBC students cannot be enrolled in 8-4-4 classes.');
     }
     // 844 students cannot be placed in CBC classes (Grade 1-12) unless explicitly transitioning
-    if (studentCurr === '844' && targetClass.curriculum_type === 'CBC' && studentCurr !== 'TRANSITIONAL') {
+    if (studentCurr === '844' && targetClass.curriculum_type === 'CBC' && dto.new_curriculum_type !== 'TRANSITIONAL') {
       throw new BadRequestException('8-4-4 students cannot be enrolled in CBC classes without a TRANSITIONAL status.');
     }
 
@@ -134,6 +139,9 @@ export class StudentsService {
       const activeYear = await tx.academicYear.findFirst({
         where: { school_id: context.schoolId, is_active: true }
       });
+      
+      // ✅ FIX: Check if activeYear is null
+      if (!activeYear) throw new BadRequestException('No active academic year found');
 
       await tx.enrollment.create({
         data: {
@@ -171,6 +179,7 @@ export class StudentsService {
 
   async findAll(query: { class_id?: string; stream_id?: string; search?: string }) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     // Prisma Extension automatically injects school_id, but we add specific filters here
     return this.prisma.student.findMany({

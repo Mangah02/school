@@ -1,7 +1,7 @@
 // apps/api/src/workers/ai-grading.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../core/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -16,7 +16,7 @@ export class AiGradingProcessor {
   ) {}
 
   @Process('grade-cbt-session')
-  async handleGrading(job: Job) {
+  async handleGrading(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     const { session_id, school_id, answers } = job.data;
     let totalScore = 0;
 
@@ -66,7 +66,7 @@ export class AiGradingProcessor {
       this.logger.log(`Session ${session_id} graded. Total Score: ${totalScore}`);
       return { success: true, totalScore };
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to grade session ${session_id}: ${error.message}`);
       throw error; // Bull will retry
     }

@@ -1,5 +1,5 @@
 // apps/api/src/modules/boarding/boarding.service.ts
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -9,6 +9,7 @@ export class BoardingService {
 
   async allocateBed(studentId: string, bedId: string, academicYearId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Verify Student Gender matches Dormitory Type
@@ -55,6 +56,8 @@ export class BoardingService {
 
   async markRollCall(dormitoryId: string, session: string, records: { student_id: string, status: string }[]) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing');
+    
     const now = new Date();
 
     return this.prisma.$transaction(async (tx) => {

@@ -1,11 +1,11 @@
 // apps/api/src/modules/finance/mpesa.service.ts
-import { Injectable, BadRequestException, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { InitiateStkPushDto } from './dto/initiate-stk-push.dto';
 import { MpesaCallbackDto } from './dto/mpesa-callback.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
-import { Queue } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { InjectQueue } from '@nestjs/bull';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -22,13 +22,14 @@ export class MpesaService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-    @InjectQueue('mpesa-stk') private mpesaQueue: Queue,
+    @InjectQueue('mpesa-stk') private mpesaQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
   ) {
-    this.consumerKey = this.configService.get<string>('MPESA_CONSUMER_KEY');
-    this.consumerSecret = this.configService.get<string>('MPESA_CONSUMER_SECRET');
-    this.shortcode = this.configService.get<string>('MPESA_SHORTCODE');
-    this.passkey = this.configService.get<string>('MPESA_PASSKEY');
-    this.callbackUrl = this.configService.get<string>('MPESA_CALLBACK_URL');
+    // ✅ FIX: Provide fallback empty strings to satisfy TypeScript's strict null checks
+    this.consumerKey = this.configService.get<string>('MPESA_CONSUMER_KEY') || '';
+    this.consumerSecret = this.configService.get<string>('MPESA_CONSUMER_SECRET') || '';
+    this.shortcode = this.configService.get<string>('MPESA_SHORTCODE') || '';
+    this.passkey = this.configService.get<string>('MPESA_PASSKEY') || '';
+    this.callbackUrl = this.configService.get<string>('MPESA_CALLBACK_URL') || '';
   }
 
   /**
@@ -36,10 +37,13 @@ export class MpesaService {
    */
   async initiateStkPush(dto: InitiateStkPushDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ FIX: Guard clause
 
     // 1. Validate Invoice
+    // ✅ FIX: Include student relation to access admission_number and first_name
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: dto.invoice_id, school_id: context.schoolId, status: { not: 'VOID' } }
+      where: { id: dto.invoice_id, school_id: context.schoolId, status: { not: 'VOID' } },
+      include: { student: true }
     });
     if (!invoice) throw new BadRequestException('Invoice not found');
     
@@ -103,7 +107,7 @@ export class MpesaService {
 
       return { success: true, checkout_request_id: checkoutRequestId, message: 'STK Push sent to phone' };
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`STK Push failed: ${error.message}`);
       await this.prisma.payment.update({
         where: { id: payment.id },
@@ -134,7 +138,8 @@ export class MpesaService {
     }
 
     // 2. Extract MPESA Receipt Number (if successful)
-    let mpesaReceipt = null;
+    // ✅ FIX: Explicitly type as string | undefined to allow string assignment
+    let mpesaReceipt: string | undefined = undefined;
     if (dto.ResultCode === 0 && dto.CallbackMetadata) {
       const receiptItem = dto.CallbackMetadata.Item.find(i => i.Name === 'MpesaReceiptNumber');
       if (receiptItem) mpesaReceipt = receiptItem.Value as string;

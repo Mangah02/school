@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/hr.controller.ts
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Req } from '@nestjs/common'; // ✅ Import Req
 import { HrService } from './hr.service';
 import { PayrollService } from './payroll.service';
 import { StaffAttendanceService } from './staff-attendance.service';
@@ -22,7 +22,7 @@ export class HrController {
   @Post('staff')
   @Permissions('hr:staff:create') // ONLY HR/Admin
   @AuditEntity('Staff')
-  async createStaff(@Body() dto: CreateStaffDto, @Request() req) {
+  async createStaff(@Body() dto: CreateStaffDto, @Req() req: any) { // ✅ Use @Req() and type as any
     return this.hrService.createStaff(dto, req.user.id);
   }
 

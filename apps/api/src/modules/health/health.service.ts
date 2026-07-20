@@ -1,5 +1,5 @@
 // apps/api/src/modules/health/health.service.ts
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EncryptionService } from '../../core/security/encryption.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -21,6 +21,7 @@ export class HealthService {
     userId: string
   ) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     // 1. Verify Student exists
     const student = await this.prisma.student.findFirst({
@@ -77,6 +78,7 @@ export class HealthService {
     nurseUserId: string
   ) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const medicalRecord = await this.prisma.medicalRecord.findFirst({
       where: { student_id: studentId, school_id: context.schoolId }
@@ -87,6 +89,7 @@ export class HealthService {
     const visit = await this.prisma.clinicVisit.create({
       data: {
         school_id: context.schoolId,
+        student_id: studentId, // ✅ FIX: Added missing student_id required by Prisma schema
         medical_record_id: medicalRecord.id,
         symptoms: data.symptoms,
         diagnosis: data.diagnosis,
@@ -112,6 +115,7 @@ export class HealthService {
    */
   async revokeConsent(studentId: string, category: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
     
     // Find the active consent and set revoked_at
     const consent = await this.prisma.consentRecord.findFirst({

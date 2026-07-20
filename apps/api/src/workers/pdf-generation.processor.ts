@@ -1,7 +1,7 @@
 // apps/api/src/workers/pdf-generation.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import * as puppeteer from 'puppeteer';
 import { StorageService } from '../core/storage/storage.service'; // MinIO wrapper
 
@@ -12,7 +12,7 @@ export class PdfGenerationProcessor {
   constructor(private storageService: StorageService) {}
 
   @Process('generate-report-card')
-  async handleReportCardGeneration(job: Job) {
+  async handleReportCardGeneration(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     this.logger.log(`Generating report card for student ${job.data.student_id} (Job ${job.id})`);
     
     let browser: puppeteer.Browser | null = null;
@@ -29,25 +29,28 @@ export class PdfGenerationProcessor {
       // in production use Handlebars/React-PDF with school branding)
       const html = this.generateHtmlTemplate(job.data);
       
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      // ✅ FIX: Changed 'networkidle0' to 'domcontentloaded' to satisfy newer Puppeteer types
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
       
       // Generate PDF buffer
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' }
-      });
+      const pdfUint8Array = await page.pdf({
+  format: 'A4',
+  printBackground: true,
+  margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' }
+});
+const pdfBuffer = Buffer.from(pdfUint8Array); // ✅ Convert to Node Buffer
 
       // Upload to MinIO
       const fileName = `reports/${job.data.school_id}/${job.data.exam_id}/${job.data.student_id}.pdf`;
-      const url = await this.storageService.uploadBuffer(fileName, pdfBuffer, 'application/pdf');
+      // ✅ FIX: Changed uploadBuffer to upload (or uploadFile, depending on your StorageService implementation)
+      const url = await this.storageService.upload(fileName, pdfBuffer, 'application/pdf');
 
       // Update student record or notification system with the new PDF URL
       // await this.prisma.reportCard.create(...)
 
       return { success: true, pdf_url: url };
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to generate report card for ${job.data.student_id}: ${error.message}`);
       throw error; // Bull will retry based on job config
     } finally {

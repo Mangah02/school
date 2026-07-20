@@ -1,7 +1,7 @@
+// apps/api/src/core/prisma/prisma.extension.ts
 import { Prisma } from '@prisma/client';
 import { tenantStorage } from '../tenant/tenant.context';
 
-// Models that require strict tenant isolation
 const TENANT_MODELS = ['User', 'Student', 'Invoice', 'AttendanceRecord', 'AuditLog'];
 
 export const tenantExtension = Prisma.defineExtension({
@@ -11,35 +11,29 @@ export const tenantExtension = Prisma.defineExtension({
       async $allOperations({ args, query, model, operation }) {
         const context = tenantStorage.getStore();
         
-        // If no context (e.g., Super Admin or public route), execute normally
         if (!context?.schoolId) {
           return query(args);
         }
 
-        // For read/update/delete operations, automatically inject school_id into the WHERE clause
-        if (TENANT_MODELS.includes(model) && operation !== 'create') {
-          args.where = args.where || {};
-          
-          // Prevent overriding if already explicitly set (e.g., by Super Admin)
-          if (!args.where.school_id) {
-            args.where.school_id = context.schoolId;
+        // Cast args to any to safely access where/data across all operation types
+        const typedArgs = args as any;
+
+        if (TENANT_MODELS.includes(model) && operation !== 'create' && operation !== 'createMany') {
+          typedArgs.where = typedArgs.where || {};
+          if (!typedArgs.where.school_id) {
+            typedArgs.where.school_id = context.schoolId;
           }
         }
 
-        // For create operations, automatically inject school_id into the data payload
         if (TENANT_MODELS.includes(model) && operation === 'create') {
-          args.data = args.data || {};
-          if (!args.data.school_id) {
-            args.data.school_id = context.schoolId;
+          typedArgs.data = typedArgs.data || {};
+          if (!typedArgs.data.school_id) {
+            typedArgs.data.school_id = context.schoolId;
           }
         }
 
-        return query(args);
+        return query(typedArgs);
       },
     },
   },
 });
-
-// Apply extension to PrismaService
-// Note: In Prisma 5+, extensions are applied via $extends()
-// In prisma.service.ts constructor: super().$extends(tenantExtension)

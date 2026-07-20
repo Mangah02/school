@@ -1,7 +1,7 @@
 // apps/api/src/workers/email.processor.ts
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
 import { PrismaService } from '../core/prisma/prisma.service';
 import { EmailProvider } from '../modules/communication/providers/email.provider';
 
@@ -15,7 +15,7 @@ export class EmailProcessor {
   ) {}
 
   @Process('send-email')
-  async handleEmail(job: Job) {
+  async handleEmail(job: Bull.Job) { // ✅ FIX: Use Bull.Job
     const { school_id, recipient_id, recipient_contact, subject, body, requested_by, is_fallback } = job.data;
 
     const log = await this.prisma.messageLog.create({
@@ -40,7 +40,7 @@ export class EmailProcessor {
       });
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       await this.prisma.messageLog.update({
         where: { id: log.id },
         data: { status: 'FAILED', error_message: error.message }

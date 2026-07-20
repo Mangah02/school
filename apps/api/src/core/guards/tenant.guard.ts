@@ -28,7 +28,7 @@ export class TenantGuard implements CanActivate {
 
     // Super Admins bypass tenant isolation (REQ-MT-004)
     if (user.role === 'super_admin') {
-      tenantStorage.enterWith({ schoolId: null, userId: user.id, isSuperAdmin: true });
+     tenantStorage.enterWith({ schoolId: 'SUPER_ADMIN', userId: user.id });
       return true;
     }
 
@@ -36,11 +36,11 @@ export class TenantGuard implements CanActivate {
       throw new UnauthorizedException('Tenant context missing for non-admin user');
     }
 
-    // Set the tenant context for this specific request lifecycle
+    // tenantStorage.enterWith({ schoolId: user.school_id, userId: user.id });
+    // //Set the tenant context for this specific request lifecycle
     tenantStorage.enterWith({ 
       schoolId: user.school_id, 
       userId: user.id,
-      isSuperAdmin: false 
     });
 
     return true;

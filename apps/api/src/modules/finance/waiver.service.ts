@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/waiver.service.ts
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'; // ✅ Added UnauthorizedException
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { RequestWaiverDto, ProcessWaiverDto } from './dto/fee-waiver.dto';
 import { tenantStorage } from '../../core/tenant/tenant.context';
@@ -14,6 +14,7 @@ export class WaiverService {
    */
   async requestWaiver(dto: RequestWaiverDto, userId: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: dto.invoice_id, school_id: context.schoolId, status: { not: 'VOID' } }
@@ -59,6 +60,7 @@ export class WaiverService {
    */
   async processWaiver(dto: ProcessWaiverDto, userId: string, userRole: string) {
     const context = tenantStorage.getStore();
+    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
 
     const waiver = await this.prisma.feeWaiver.findFirst({
       where: { id: dto.waiver_id, school_id: context.schoolId, status: 'PENDING' },

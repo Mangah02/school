@@ -1,13 +1,13 @@
 // apps/api/src/core/search/meilisearch.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MeiliSearch, Index } from 'meilisearch';
+import { Meilisearch, Index } from 'meilisearch'; // ✅ Correct import
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class MeilisearchService implements OnModuleInit {
   private readonly logger = new Logger(MeilisearchService.name);
-  private client: MeiliSearch;
+  private client: Meilisearch; // ✅ Updated type
   private studentIndex: Index;
   private staffIndex: Index;
   private bookIndex: Index;
@@ -16,7 +16,7 @@ export class MeilisearchService implements OnModuleInit {
     private configService: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.client = new MeiliSearch({
+    this.client = new Meilisearch({ // ✅ Updated instantiation
       host: this.configService.get<string>('MEILISEARCH_HOST') || 'http://localhost:7700',
       apiKey: this.configService.get<string>('MEILISEARCH_MASTER_KEY'),
     });
@@ -24,13 +24,11 @@ export class MeilisearchService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Initialize or get existing indexes
       this.studentIndex = await this.client.index('students');
       this.staffIndex = await this.client.index('staff');
       this.bookIndex = await this.client.index('books');
-      
       this.logger.log('MeiliSearch indexes initialized successfully');
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Failed to initialize MeiliSearch indexes', error.message);
     }
   }

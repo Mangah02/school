@@ -1,10 +1,15 @@
 // apps/api/src/modules/billing/webhook.controller.ts
-import { Controller, Post, Body, Headers, RawBodyRequest, Req } from '@nestjs/common';
+import { Controller, Post, Body, Headers, Req } from '@nestjs/common';
+import { Request } from 'express'; // ✅ Import express Request
 import { SubscriptionService } from './subscription.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { Public } from '../../core/guards/public.decorator';
 import { ApiTags } from '@nestjs/swagger';
-import * as crypto from 'crypto';
+
+// ✅ Extend Express Request to include rawBody for Stripe
+interface StripeWebhookRequest extends Request {
+  rawBody?: Buffer;
+}
 
 @ApiTags('Billing Webhooks')
 @Controller('billing/webhooks')
@@ -19,12 +24,12 @@ export class WebhookController {
    */
   @Public()
   @Post('stripe')
-  async handleStripeWebhook(@Headers('stripe-signature') signature: string, @Req() req: RawBodyRequest<Request>) {
+  async handleStripeWebhook(@Headers('stripe-signature') signature: string, @Req() req: StripeWebhookRequest) {
     // In production: Use stripe.webhooks.constructEvent(req.rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET)
     // Mock implementation for structure:
-    const event = req.body; 
+    const event = req.body as any; // ✅ Type as any to bypass stream inference issues
     
-    if (event.type === 'invoice.payment_succeeded') {
+    if (event && event.type === 'invoice.payment_succeeded') {
       const customerId = event.data.object.customer;
       // Find school by external_customer_id
       const sub = await this.prisma.schoolSubscription.findFirst({ where: { external_customer_id: customerId } });
