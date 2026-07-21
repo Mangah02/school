@@ -3,9 +3,9 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EncryptionService } from './encryption.service';
 
-@Global() // ✅ Makes EncryptionService available everywhere automatically
+@Global() // ✅ Makes EncryptionService available everywhere
 @Module({
-  imports: [ConfigModule], // ✅ Ensures ConfigService is available to EncryptionService
+  imports: [ConfigModule],
   providers: [EncryptionService],
   exports: [EncryptionService],
 })

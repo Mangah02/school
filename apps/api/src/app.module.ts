@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'; // Added APP_INTERCEPTOR here
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'; 
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';// Added APP_INTERCEPTOR here
 
 // Core Imports
 import { PrismaModule } from './core/prisma/prisma.module';
@@ -41,6 +43,23 @@ import { AuditInterceptor } from './core/interceptors/audit.interceptor';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ 
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        redis: {
+          host: config.get('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get('REDIS_PASSWORD'), // undefined is fine if you don't use one
+        },
+      }),
+      inject: [ConfigService],
+    }),
+
     // Core
     PrismaModule, 
     TenantModule, 

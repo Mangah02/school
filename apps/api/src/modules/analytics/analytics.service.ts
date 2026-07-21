@@ -2,6 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { SuperAdminPrismaService } from '../../core/prisma/super-admin.prisma.service';
+import { AuditService } from '../../core/audit/audit.service';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class AnalyticsService {
   constructor(
     private prisma: PrismaService,
     private superAdminPrisma: SuperAdminPrismaService,
+    private auditService: AuditService,
   ) {}
 
   /**
@@ -21,7 +23,7 @@ export class AnalyticsService {
     const context = tenantStorage.getStore();
     if (!context?.schoolId) {
       throw new Error('Tenant context missing');
-        }
+    }
 
     // Run queries in parallel for performance
     const [
@@ -75,12 +77,28 @@ export class AnalyticsService {
 
   /**
    * Super Admin Global Analytics
-   * This query bypasses RLS and is automatically audit-logged by the SuperAdminPrismaService middleware.
+   * This query bypasses RLS and is manually audit-logged (replacing the broken middleware).
    */
   async getGlobalStudentCount() {
-    return this.superAdminPrisma.student.count({
+    const context = tenantStorage.getStore();
+    
+    // 1. Perform the cross-school query
+    const studentCount = await this.superAdminPrisma.client.student.count({
       where: { is_deleted: false }
     });
+
+    // 2. Manually log the Super Admin action
+    this.auditService.logAction({
+      school_id: null, // Cross-school
+      user_id: context?.userId || null,
+      action: 'SUPER_ADMIN_VIEW_GLOBAL_STATS',
+      entity_type: 'Student',
+      entity_id: null,
+      after_state: { count: studentCount },
+      ip_address: 'SYSTEM',
+    } as any);
+
+    return { totalStudents: studentCount };
   }
 
   /**
@@ -144,7 +162,7 @@ export class AnalyticsService {
               historical_avg: historicalAverage, 
               deviation_percent: deviationPercent 
             }
-          }
+          } as any // Cast to any to satisfy Prisma's strict JSON typing
         });
       }
     }

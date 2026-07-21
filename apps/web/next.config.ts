@@ -9,6 +9,7 @@ const withSerwist = withSerwistInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {}, // tells Next "yes, I know, I'm fine with Turbopack defaults"
   output: 'standalone', // Required for our Phase 11 Dockerfile
   reactStrictMode: true,
 };

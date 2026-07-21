@@ -41,7 +41,7 @@ export class AiService {
     if (!context?.schoolId) throw new BadRequestException('Tenant context missing');
 
     // 1. Strip PII (REQ-RATE-005 / Milestone 8.7)
-    const sanitizedPrompt = this.piiStripper.strip(rawPrompt);
+    const sanitizedPrompt = this.piiStripper.stripPII(rawPrompt);
 
     // 2. ESTIMATED COST CHECK (Mock estimation before calling API)
     // In production, use tiktoken to count tokens and multiply by model pricing
