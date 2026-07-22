@@ -1,9 +1,9 @@
 // apps/api/src/modules/student/students.service.ts
-import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common'; // ✅ Added NotFoundException, UnauthorizedException
+import { Injectable, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AdmitStudentDto } from './dto/admit-student.dto';
-import { PromoteStudentDto } from './dto/promote-student.dto'; // ✅ Added missing import
-import * as Bull from 'bull'; // ✅ FIX: Namespace import for Bull
+import { PromoteStudentDto } from './dto/promote-student.dto';
+import * as Bull from 'bull';
 import { InjectQueue } from '@nestjs/bull';
 import { tenantStorage } from '../../core/tenant/tenant.context';
 
@@ -11,33 +11,102 @@ import { tenantStorage } from '../../core/tenant/tenant.context';
 export class StudentsService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('notifications') private notificationsQueue: Bull.Queue, // ✅ FIX: Use Bull.Queue
+    @InjectQueue('notifications') private notificationsQueue: Bull.Queue,
   ) {}
+
+  async createStudent(data: any, schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('School ID missing from authentication token');
+    }
+
+    return this.prisma.student.create({
+      data: {
+        school_id: schoolId,
+        admission_number: data.admission_number,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        date_of_birth: new Date(data.date_of_birth),
+        gender: data.gender,
+        nationality: data.nationality || 'Kenyan',
+        curriculum_type: 'CBC',
+        status: 'ACTIVE',
+        is_deleted: false,
+      },
+    });
+  }
+
+  async findOne(id: string, schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('School ID missing from authentication token');
+    }
+
+    const student = await this.prisma.student.findFirst({
+      where: { id, school_id: schoolId, is_deleted: false },
+      include: {
+        stream: { include: { class: true } },
+        enrollment: { include: { academic_year: true, class: true } },
+        guardians: { 
+          include: { 
+            guardian: true 
+          } 
+        },
+        medicalRecord: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found or does not belong to this school');
+    }
+
+    return student;
+  }
+
+  async updateStudent(id: string, data: any, schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('School ID missing from authentication token');
+    }
+
+    // Verify the student belongs to the school and is not deleted
+    const existing = await this.prisma.student.findFirst({
+      where: { id, school_id: schoolId, is_deleted: false }
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Student not found or does not belong to this school');
+    }
+
+    return this.prisma.student.update({
+      where: { id },
+      data: {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        admission_number: data.admission_number,
+        date_of_birth: data.date_of_birth ? new Date(data.date_of_birth) : undefined,
+        gender: data.gender,
+        nationality: data.nationality,
+      },
+    });
+  }
 
   async admitStudent(dto: AdmitStudentDto) {
     const context = tenantStorage.getStore();
-    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
-    // 1. Generate Admission Number (Format: KMS_CODE/YYYY/####)
     const studentCount = await this.prisma.student.count({ where: { school_id: context.schoolId } });
     const school = await this.prisma.school.findUnique({ where: { id: context.schoolId } });
     
-    // ✅ FIX: Check if school is null
     if (!school) throw new BadRequestException('School not found');
     
     const prefix = school.kms_code || 'SCH';
     const year = new Date().getFullYear();
     const admissionNumber = `${prefix}/${year}/${String(studentCount + 1).padStart(4, '0')}`;
 
-    // 2. Get active academic year
     const activeYear = await this.prisma.academicYear.findFirst({
       where: { school_id: context.schoolId, is_active: true }
     });
     if (!activeYear) throw new BadRequestException('No active academic year found. Please complete onboarding.');
 
-    // 3. Execute Admission in Transaction
     return this.prisma.$transaction(async (tx) => {
-      // Create Student
       const student = await tx.student.create({
         data: {
           school_id: context.schoolId,
@@ -56,7 +125,6 @@ export class StudentsService {
         },
       });
 
-      // Create Enrollment
       await tx.enrollment.create({
         data: {
           student_id: student.id,
@@ -65,7 +133,6 @@ export class StudentsService {
         },
       });
 
-      // Create Guardians and Link (Milestone 5.4)
       for (const g of dto.guardians) {
         const guardian = await tx.guardian.create({
           data: {
@@ -84,7 +151,6 @@ export class StudentsService {
         });
       }
 
-      // 4. Queue Welcome SMS to Primary Guardian
       const primaryGuardian = dto.guardians.find(g => g.is_primary) || dto.guardians[0];
       if (primaryGuardian) {
         await this.notificationsQueue.add('send-sms', {
@@ -99,9 +165,8 @@ export class StudentsService {
 
   async promoteStudent(dto: PromoteStudentDto) {
     const context = tenantStorage.getStore();
-    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    if (!context) throw new UnauthorizedException('Tenant context missing');
 
-    // 1. Fetch student and target class
     const student = await this.prisma.student.findFirst({
       where: { id: dto.student_id, school_id: context.schoolId, is_deleted: false },
       include: { enrollment: true }
@@ -113,21 +178,16 @@ export class StudentsService {
     });
     if (!targetClass) throw new NotFoundException('Target class not found');
 
-    // 2. R-01 Mitigation: Strict Curriculum Validation
     const studentCurr = dto.new_curriculum_type || student.curriculum_type;
     
-    // CBC students cannot be placed in 844 classes (Form 1-4)
     if (studentCurr === 'CBC' && targetClass.curriculum_type === '844') {
       throw new BadRequestException('CBC students cannot be enrolled in 8-4-4 classes.');
     }
-    // 844 students cannot be placed in CBC classes (Grade 1-12) unless explicitly transitioning
     if (studentCurr === '844' && targetClass.curriculum_type === 'CBC' && dto.new_curriculum_type !== 'TRANSITIONAL') {
       throw new BadRequestException('8-4-4 students cannot be enrolled in CBC classes without a TRANSITIONAL status.');
     }
 
-    // 3. Execute Promotion in Transaction
     return this.prisma.$transaction(async (tx) => {
-      // Archive old enrollment
       if (student.enrollment) {
         await tx.enrollment.update({
           where: { id: student.enrollment.id },
@@ -135,12 +195,10 @@ export class StudentsService {
         });
       }
 
-      // Create new enrollment
       const activeYear = await tx.academicYear.findFirst({
         where: { school_id: context.schoolId, is_active: true }
       });
       
-      // ✅ FIX: Check if activeYear is null
       if (!activeYear) throw new BadRequestException('No active academic year found');
 
       await tx.enrollment.create({
@@ -151,7 +209,6 @@ export class StudentsService {
         },
       });
 
-      // Update student record
       await tx.student.update({
         where: { id: student.id },
         data: {
@@ -160,7 +217,6 @@ export class StudentsService {
         },
       });
 
-      // Audit log the promotion reason
       await tx.auditLog.create({
         data: {
           school_id: context.schoolId,
@@ -169,7 +225,7 @@ export class StudentsService {
           entity_type: 'Student',
           entity_id: student.id,
           new_values: { reason: dto.reason, new_class: targetClass.name },
-          ip_address: 'SYSTEM', // Will be overridden by interceptor if available
+          ip_address: 'SYSTEM',
         }
       });
 
@@ -177,13 +233,17 @@ export class StudentsService {
     });
   }
 
-  async findAll(query: { class_id?: string; stream_id?: string; search?: string }) {
+  async findAll(query: { class_id?: string; stream_id?: string; search?: string }, providedSchoolId?: string) {
     const context = tenantStorage.getStore();
-    if (!context) throw new UnauthorizedException('Tenant context missing'); // ✅ Added guard
+    const schoolId = providedSchoolId || context?.schoolId;
+
+    if (!schoolId) {
+      throw new UnauthorizedException('Tenant context missing: No school_id provided');
+    }
     
-    // Prisma Extension automatically injects school_id, but we add specific filters here
     return this.prisma.student.findMany({
       where: {
+        school_id: schoolId,
         is_deleted: false,
         stream_id: query.stream_id,
         stream: { class_id: query.class_id },
@@ -194,6 +254,24 @@ export class StudentsService {
         ] : undefined,
       },
       include: { stream: { include: { class: true } }, guardians: { include: { guardian: true } } },
+      orderBy: { admission_number: 'asc' },
+    });
+  }
+
+  async getUnenrolledStudents(schoolId: string) {
+    return this.prisma.student.findMany({
+      where: {
+        school_id: schoolId,
+        is_deleted: false,
+        OR: [
+          { enrollment: { is: null } },
+          { enrollment: { status: { not: 'ACTIVE' } } }
+        ]
+      },
+      include: { 
+        stream: true,
+        enrollment: true 
+      },
       orderBy: { admission_number: 'asc' },
     });
   }

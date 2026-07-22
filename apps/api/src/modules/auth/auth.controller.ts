@@ -3,13 +3,11 @@ import {
   Controller, Post, Body, UseGuards, Req, Res, 
   HttpCode, HttpStatus, Ip, UnauthorizedException 
 } from '@nestjs/common';
-import type { Request, Response } from 'express'; // ✅ FIX: Must use 'import type' for isolatedModules
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../../core/decorators/public.decorator';
@@ -19,23 +17,33 @@ import { Public } from '../../core/decorators/public.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('login')
-  @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
   async login(
     @Req() req: Request & { user: any }, 
     @Res({ passthrough: true }) res: Response,
-    @Ip() ip: string
+    @Ip() ip: string,
+    @Body() body: any 
   ) {
-    const loginResult = await this.authService.login(req.user, ip);
+    console.log('🎯 [AuthController] login() reached!');
+    console.log('🎯 [AuthController] Received body:', body);
+    
+    const user = await this.authService.validateUser(body.email, body.password);
+    console.log('🎯 [AuthController] validateUser returned:', user ? 'SUCCESS' : 'FAILED');
 
-    const tokenToSet = (loginResult as any).refreshToken || req.user.refreshToken;
-    if (tokenToSet) {
-      res.cookie('refresh_token', tokenToSet, {
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const loginResult = await this.authService.login(user, ip);
+
+    if (loginResult.refreshToken) {
+      res.cookie('refresh_token', loginResult.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax', // ✅ FIX: 'lax' allows cross-port localhost requests to send cookies
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
     }
@@ -49,6 +57,7 @@ export class AuthController {
     };
   }
 
+  @Public() // ✅ FIX: Refresh endpoint MUST be public to allow access token renewal without a valid access token
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
@@ -56,13 +65,25 @@ export class AuthController {
     @Req() req: Request & { cookies?: any }, 
     @Res({ passthrough: true }) res: Response
   ) {
+    console.log('🎯 [AuthController] refreshTokens() reached!');
+    console.log('🎯 [AuthController] Cookies received:', req.cookies);
+    
     const refreshToken = req.cookies?.['refresh_token'];
-    if (!refreshToken) throw new UnauthorizedException('Refresh token missing');
+    if (!refreshToken) {
+      console.warn('⚠️ [AuthController] Refresh token missing in cookies');
+      throw new UnauthorizedException('Refresh token missing');
+    }
 
     const decoded = this.authService['jwtService'].decode(refreshToken) as any;
-    if (!decoded || !decoded.sub) throw new UnauthorizedException('Invalid refresh token');
+    if (!decoded || !decoded.sub) {
+      console.warn('⚠️ [AuthController] Invalid refresh token payload');
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
+    console.log('🎯 [AuthController] Calling authService.refreshTokens for user:', decoded.sub);
     const result = await this.authService.refreshTokens(decoded.sub, refreshToken);
+    
+    console.log('🎯 [AuthController] Refresh successful');
     return { success: true, data: { accessToken: result.accessToken } };
   }
 

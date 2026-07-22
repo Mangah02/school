@@ -157,14 +157,14 @@ export function WaiverManager({ isFinanceRole }: Props) {
             <div>
               <Label>Waiver Amount (KES)</Label>
               <Input type="number" value={waiverAmount} onChange={e => setWaiverAmount(e.target.value)} />
-              <p className="text-xs text-gray-500 mt-1">* >25% requires Principal approval. >50% requires Board approval.</p>
+              <p className="text-xs text-gray-500 mt-1">* &gt; 25% requires Principal approval. &gt; 50% requires Board approval.</p>
             </div>
             <div>
               <Label>Justification</Label>
               <Input value={justification} onChange={e => setJustification(e.target.value)} placeholder="Reason for waiver request" />
             </div>
             <div>
-              <Label>Board Resolution Document (Required if >50%)</Label>
+              <Label>Board Resolution Document (Required if &gt; 50%)</Label>
               <Input type="url" value={boardResolutionUrl} onChange={e => setBoardResolutionUrl(e.target.value)} placeholder="https://minio.../resolution.pdf" />
             </div>
           </div>

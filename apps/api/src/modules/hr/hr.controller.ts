@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/hr.controller.ts
-import { Controller, Post, Body, Get, Param, Req } from '@nestjs/common'; // ✅ Import Req
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { HrService } from './hr.service';
 import { PayrollService } from './payroll.service';
 import { StaffAttendanceService } from './staff-attendance.service';
@@ -7,7 +7,8 @@ import { CreateStaffDto } from './dto/create-staff.dto';
 import { CreateLeaveRequestDto } from './dto/leave-request.dto';
 import { Permissions } from '../../core/guards/permissions.decorator';
 import { AuditEntity } from '../../core/decorators/audit-entity.decorator';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import type { Request } from 'express';
 
 @ApiTags('HR & Payroll')
 @Controller('hr')
@@ -19,39 +20,52 @@ export class HrController {
   ) {}
 
   // --- STAFF RECORDS ---
-  @Post('staff')
-  @Permissions('hr:staff:create') // ONLY HR/Admin
-  @AuditEntity('Staff')
-  async createStaff(@Body() dto: CreateStaffDto, @Req() req: any) { // ✅ Use @Req() and type as any
-    return this.hrService.createStaff(dto, req.user.id);
+  
+  // ✅ NEW: Get all staff (with optional role filter for timetable)
+  @Get('staff')
+  @Permissions('hr:staff:view')
+  @ApiOperation({ summary: 'Get all staff members, optionally filtered by role' })
+    async getAllStaff(@Req() req: Request & { user: any }, @Query('role') role?: string) {
+    return this.hrService.getStaff(req.user.school_id, role);
   }
 
   @Get('staff/:id')
-  @Permissions('hr:staff:view') // ONLY HR/Admin
-  async getStaff(@Param('id') id: string) {
+  @Permissions('hr:staff:view')
+  @ApiOperation({ summary: 'Get a specific staff member profile' })
+  async getStaffProfile(@Param('id') id: string) {
     return this.hrService.getStaffProfile(id);
+  }
+
+  @Post('staff')
+  @Permissions('hr:staff:create')
+  @AuditEntity('Staff')
+  @ApiOperation({ summary: 'Create a new staff member' })
+  async createStaff(@Body() dto: CreateStaffDto, @Req() req: Request & { user: any }) {
+    return this.hrService.createStaff(dto, req.user.sub);
   }
 
   // --- PAYROLL ---
   @Post('payroll/process')
-  @Permissions('hr:payroll:process') // ONLY HR/Admin
+  @Permissions('hr:payroll:process')
   @AuditEntity('PayrollRecord')
+  @ApiOperation({ summary: 'Process monthly payroll' })
   async processPayroll(@Body() body: { month: number, year: number }) {
     return this.payrollService.processMonthlyPayroll(body.month, body.year);
   }
 
   // --- STAFF ATTENDANCE ---
-  // SRS 19.2: ONLY HR/Admin role can access staff attendance. Teachers are explicitly barred.
   @Post('attendance')
-  @Permissions('hr:attendance:manage') // Strict HR-only permission
+  @Permissions('hr:attendance:manage')
   @AuditEntity('StaffAttendance')
+  @ApiOperation({ summary: 'Mark staff attendance' })
   async markAttendance(@Body() body: { staff_id: string, date: string, status: string }) {
     return this.attendanceService.markAttendance(body.staff_id, body.date, body.status);
   }
 
   @Get('attendance/report')
-  @Permissions('hr:attendance:view') // Strict HR-only permission
-  async getAttendanceReport(@Body() body: { month: number, year: number }) {
-    return this.attendanceService.getStaffAttendanceReport(body.month, body.year);
+  @Permissions('hr:attendance:view')
+  @ApiOperation({ summary: 'Get staff attendance report' })
+  async getAttendanceReport(@Query('month') month: number, @Query('year') year: number) {
+    return this.attendanceService.getStaffAttendanceReport(month, year);
   }
 }

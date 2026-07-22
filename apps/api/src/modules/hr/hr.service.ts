@@ -88,4 +88,27 @@ export class HrService {
       bank_account: staff.bank_account ? this.encryption.decrypt(staff.bank_account) : null,
     };
   }
+
+    async getStaff(schoolId: string, role?: string) {
+    return this.prisma.staff.findMany({
+      where: {
+        school_id: schoolId,
+        is_deleted: false,
+        // If a role is provided (e.g., 'teacher'), filter by the related User's role name
+        user: role ? {
+          role: {
+            name: role,
+          },
+        } : undefined,
+      },
+      include: {
+        user: {
+          include: {
+            role: true,
+          },
+        },
+      },
+      orderBy: { first_name: 'asc' },
+    });
+  }
 }

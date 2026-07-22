@@ -13,7 +13,7 @@ import api from '@/lib/api';
 
 interface ClassOpt { id: string; name: string; streams: { id: string; name: string }[]; }
 interface Subject { id: string; name: string; code: string; }
-interface Teacher { id: string; first_name: string; last_name: string; }
+interface StaffMember { id: string; first_name: string; last_name: string; }
 
 interface TimetableSlot {
   id?: string;
@@ -21,9 +21,9 @@ interface TimetableSlot {
   start_time: string;
   end_time: string;
   subject_id?: string;
-  teacher_id?: string;
+  staff_id?: string;
   subject?: Subject;
-  teacher?: Teacher;
+  staff?: StaffMember;
 }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -40,7 +40,7 @@ const TIME_SLOTS = [
 export function TimetableManager() {
   const [classes, setClasses] = useState<ClassOpt[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [teachers, setTeachers] = useState<StaffMember[]>([]);
   
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedStreamId, setSelectedStreamId] = useState('');
@@ -51,7 +51,7 @@ export function TimetableManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<TimetableSlot | null>(null);
   const [formSubject, setFormSubject] = useState('');
-  const [formTeacher, setFormTeacher] = useState('');
+  const [formStaff, setFormStaff] = useState(''); // ✅ FIXED: Renamed from formTeacher
 
   // 1. Fetch initial data
   useEffect(() => {
@@ -60,12 +60,14 @@ export function TimetableManager() {
         const [clsRes, subRes, tchRes] = await Promise.all([
           api.get('/academic/classes'),
           api.get('/academic/subjects'),
-          api.get('/staff?role=teacher') // Assuming backend filters by role
+          api.get('/hr/staff?role=teacher') 
         ]);
         setClasses(clsRes.data);
         setSubjects(subRes.data);
         setTeachers(tchRes.data);
-      } catch (error) { toast.error('Failed to load timetable prerequisites'); }
+      } catch (error) { 
+        toast.error('Failed to load timetable prerequisites'); 
+      }
     };
     fetchBaseData();
   }, []);
@@ -93,14 +95,18 @@ export function TimetableManager() {
               start_time: slot.start,
               end_time: slot.end,
               subject_id: existing?.subject_id,
-              teacher_id: existing?.teacher_id,
+              staff_id: existing?.staff_id, // ✅ FIXED: Renamed from teacher_id
               subject: existing?.subject,
-              teacher: existing?.teacher,
+              staff: existing?.staff, // ✅ FIXED: Renamed from teacher
             });
           }
         }
         setTimetable(grid);
-      } catch (error) { toast.error('Failed to load timetable'); } finally { setLoading(false); }
+      } catch (error) { 
+        toast.error('Failed to load timetable'); 
+      } finally { 
+        setLoading(false); 
+      }
     };
 
     fetchTimetable();
@@ -111,7 +117,7 @@ export function TimetableManager() {
   const handleCellClick = (slot: TimetableSlot) => {
     setEditingSlot(slot);
     setFormSubject(slot.subject_id || '');
-    setFormTeacher(slot.teacher_id || '');
+    setFormStaff(slot.staff_id || ''); // ✅ FIXED: Uses setFormStaff
     setIsDialogOpen(true);
   };
 
@@ -125,7 +131,7 @@ export function TimetableManager() {
         start_time: editingSlot.start_time,
         end_time: editingSlot.end_time,
         subject_id: formSubject || null,
-        teacher_id: formTeacher || null,
+        staff_id: formStaff || null, // ✅ FIXED: Uses formStaff
       };
 
       if (editingSlot.id) {
@@ -139,9 +145,10 @@ export function TimetableManager() {
       
       // Refresh grid
       const res = await api.get(`/academic/timetables?stream_id=${selectedStreamId}`);
-      // (In a real app, you'd re-run the mapping logic here, or just trigger a re-fetch)
-      window.location.reload(); // Simple reload for grid refresh
-    } catch (error) { toast.error('Failed to save slot'); }
+      window.location.reload(); 
+    } catch (error) { 
+      toast.error('Failed to save slot'); 
+    }
   };
 
   return (
@@ -203,7 +210,7 @@ export function TimetableManager() {
                             <div>
                               <p className="font-bold text-blue-800 text-xs">{slot.subject?.code || slot.subject?.name}</p>
                               <p className="text-[10px] text-gray-500 mt-1">
-                                {slot.teacher?.first_name} {slot.teacher?.last_name?.[0]}.
+                                {slot.staff?.first_name} {slot.staff?.last_name?.[0]}.
                               </p>
                             </div>
                           ) : (
@@ -237,9 +244,9 @@ export function TimetableManager() {
               </Select>
             </div>
             <div>
-              <Label>Teacher</Label>
-              <Select value={formTeacher} onValueChange={setFormTeacher}>
-                <SelectTrigger><SelectValue placeholder="Select teacher..." /></SelectTrigger>
+              <Label>Staff Member</Label>
+              <Select value={formStaff} onValueChange={setFormStaff}> {/* ✅ FIXED: Uses formStaff and setFormStaff */}
+                <SelectTrigger><SelectValue placeholder="Select staff member..." /></SelectTrigger>
                 <SelectContent>
                   {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>)}
                 </SelectContent>

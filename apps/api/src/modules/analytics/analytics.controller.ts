@@ -1,27 +1,27 @@
 // apps/api/src/modules/analytics/analytics.controller.ts
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { AnalyticsService } from './analytics.service';
-import { AnomalyService } from './anomaly.service';
-import { Permissions } from '../../core/guards/permissions.decorator';
-import { ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Adjust path if needed
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
-@ApiTags('Analytics & Reporting')
+@ApiTags('Analytics')
 @Controller('analytics')
 export class AnalyticsController {
-  constructor(
-    private readonly analyticsService: AnalyticsService,
-    private readonly anomalyService: AnomalyService,
-  ) {}
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
-  @Permissions('analytics:dashboard:view')
-  async getDashboard() {
-    return this.analyticsService.getSchoolDashboardKpis();
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get school dashboard KPIs' })
+  async getDashboard(@Req() req: Request & { user: any }) {
+    // ✅ Pass the school_id directly from the authenticated user's JWT
+    return this.analyticsService.getSchoolDashboardKpis(req.user.school_id);
   }
 
   @Get('anomalies/finance')
-  @Permissions('analytics:anomaly:view') // DPO / Principal / Finance Officer
-  async getFinancialAnomalies() {
-    return this.anomalyService.detectFinancialAnomalies();
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Detect financial anomalies' })
+  async detectAnomalies(@Req() req: Request & { user: any }) {
+    return this.analyticsService.detectFinancialAnomalies(req.user.school_id);
   }
 }

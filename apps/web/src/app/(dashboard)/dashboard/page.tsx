@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { KpiCard } from '@/components/dashboard/KpiCard';
-import { Users, GraduationCap, DollarSign, TrendingUp, BookOpen, Bus, AlertCircle, Skeleton } from 'lucide-react';
+import { Users, GraduationCap, DollarSign, TrendingUp, BookOpen, Bus, AlertCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardData {
   total_students: number;

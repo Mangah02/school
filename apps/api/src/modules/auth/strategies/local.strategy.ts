@@ -7,15 +7,22 @@ import { AuthService } from '../auth.service';
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private authService: AuthService) {
-    // We use 'email' instead of the default 'username'
-    super({ usernameField: 'email' }); 
+    console.log('🛡️ [LocalStrategy] Constructor initialized');
+    // Tell Passport to look for 'email' and 'password' in the request body
+    super({ usernameField: 'email', passwordField: 'password' }); 
   }
 
   async validate(email: string, password: string): Promise<any> {
+    console.log('🛡️ [LocalStrategy] validate() CALLED! Email:', email, 'Password length:', password?.length);
+    
     const user = await this.authService.validateUser(email, password);
+    
     if (!user) {
+      console.log('❌ [LocalStrategy] validateUser returned null/false');
       throw new UnauthorizedException('Invalid email or password');
     }
+    
+    console.log('✅ [LocalStrategy] validateUser succeeded, returning user');
     return user;
   }
 }

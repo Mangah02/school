@@ -19,10 +19,13 @@ export class AnalyticsService {
    * Aggregates cross-module KPIs for the School Admin Dashboard.
    * Uses optimized Prisma aggregates backed by the partial indexes defined in Phase 3.
    */
-  async getSchoolDashboardKpis() {
+  async getSchoolDashboardKpis(providedSchoolId?: string) {
     const context = tenantStorage.getStore();
-    if (!context?.schoolId) {
-      throw new Error('Tenant context missing');
+    // ✅ Use provided ID, or fall back to tenant context
+    const schoolId = providedSchoolId || context?.schoolId;
+
+    if (!schoolId) {
+      throw new Error('Tenant context missing: No school_id provided or found in context');
     }
 
     // Run queries in parallel for performance
@@ -34,19 +37,19 @@ export class AnalyticsService {
     ] = await Promise.all([
       // Student Stats
       this.prisma.student.count({
-        where: { school_id: context.schoolId, is_deleted: false }
+        where: { school_id: schoolId, is_deleted: false }
       }),
       
       // Finance Stats (Current Term)
       this.prisma.invoice.aggregate({
-        where: { school_id: context.schoolId, status: { not: 'VOID' } },
+        where: { school_id: schoolId, status: { not: 'VOID' } },
         _sum: { total_amount: true, paid_amount: true },
       }),
 
       // Today's Attendance
       this.prisma.attendanceRecord.count({
         where: { 
-          school_id: context.schoolId, 
+          school_id: schoolId, 
           date: new Date(), 
           status: 'PRESENT' 
         }
@@ -54,7 +57,7 @@ export class AnalyticsService {
 
       // Staff Count
       this.prisma.staff.count({
-        where: { school_id: context.schoolId, is_deleted: false }
+        where: { school_id: schoolId, is_deleted: false }
       })
     ]);
 
@@ -77,10 +80,11 @@ export class AnalyticsService {
 
   /**
    * Super Admin Global Analytics
-   * This query bypasses RLS and is manually audit-logged (replacing the broken middleware).
+   * This query bypasses RLS and is manually audit-logged.
    */
-  async getGlobalStudentCount() {
+  async getGlobalStudentCount(providedUserId?: string) {
     const context = tenantStorage.getStore();
+    const userId = providedUserId || context?.userId;
     
     // 1. Perform the cross-school query
     const studentCount = await this.superAdminPrisma.client.student.count({
@@ -90,7 +94,7 @@ export class AnalyticsService {
     // 2. Manually log the Super Admin action
     this.auditService.logAction({
       school_id: null, // Cross-school
-      user_id: context?.userId || null,
+      user_id: userId || null,
       action: 'SUPER_ADMIN_VIEW_GLOBAL_STATS',
       entity_type: 'Student',
       entity_id: null,
@@ -105,10 +109,12 @@ export class AnalyticsService {
    * Detects financial anomalies: specifically, a sudden spike in Fee Waivers 
    * compared to the historical average, which could indicate fraud or system abuse.
    */
-  async detectFinancialAnomalies() {
+  async detectFinancialAnomalies(providedSchoolId?: string) {
     const context = tenantStorage.getStore();
-    if (!context?.schoolId) {
-      throw new Error('Tenant context missing');
+    const schoolId = providedSchoolId || context?.schoolId;
+
+    if (!schoolId) {
+      throw new Error('Tenant context missing: No school_id provided or found in context');
     }
     
     const now = new Date();
@@ -117,7 +123,7 @@ export class AnalyticsService {
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentWaivers = await this.prisma.feeWaiver.aggregate({
       where: {
-        school_id: context.schoolId,
+        school_id: schoolId,
         status: 'APPROVED',
         created_at: { gte: currentMonthStart }
       },
@@ -129,7 +135,7 @@ export class AnalyticsService {
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
     const historicalWaivers = await this.prisma.feeWaiver.aggregate({
       where: {
-        school_id: context.schoolId,
+        school_id: schoolId,
         status: 'APPROVED',
         created_at: { gte: threeMonthsAgo, lt: currentMonthStart }
       },
@@ -149,12 +155,12 @@ export class AnalyticsService {
       deviationPercent = ((currentWaiverTotal - historicalAverage) / historicalAverage) * 100;
       if (deviationPercent > 50) { // 50% spike threshold
         anomalyDetected = true;
-        this.logger.warn(`FINANCIAL ANOMALY DETECTED: School ${context.schoolId} waivers spiked by ${deviationPercent.toFixed(2)}%`);
+        this.logger.warn(`FINANCIAL ANOMALY DETECTED: School ${schoolId} waivers spiked by ${deviationPercent.toFixed(2)}%`);
         
         // Log to Audit for DPO/Principal review
         await this.prisma.auditLog.create({
           data: {
-            school_id: context.schoolId,
+            school_id: schoolId,
             action: 'ANOMALY_DETECTED',
             entity_type: 'FinancialWaiver',
             new_values: { 

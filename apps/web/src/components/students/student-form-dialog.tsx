@@ -64,15 +64,18 @@ export function StudentFormDialog({ isOpen, onClose, student, onSuccess }: Props
   const onSubmit = async (data: StudentFormValues) => {
     try {
       if (isEditing) {
-        await api.put(`/students/${student.id}`, data);
-         toast.success('Student updated successfully');
+        // ✅ Use singular '/student' and the student's ID
+        await api.put(`/student/${student.id}`, data);
+        toast.success('Student updated successfully');
       } else {
-        await api.post('/students', data);
+        // ✅ Use singular '/student' for creation
+        await api.post('/student', data);
         toast.success('New student admitted successfully');
       }
       onSuccess();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save student. Please try aagain');
+      console.error('Save student error:', error);
+      toast.error(error.response?.data?.message || 'Failed to save student. Please try again.');
     }
   };
 

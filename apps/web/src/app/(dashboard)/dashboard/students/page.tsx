@@ -32,7 +32,7 @@ export default function StudentsPage() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/students'); // Calls Phase 5.3 Backend
+      const res = await api.get('/student'); // Calls Phase 5.3 Backend
       setStudents(res.data);
     } catch (error) {
       console.error('Failed to fetch students', error);

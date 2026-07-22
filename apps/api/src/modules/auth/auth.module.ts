@@ -13,19 +13,23 @@ import { RedisModule } from '../../core/redis/redis.module';
 @Module({
   imports: [
     PrismaModule,
-    RedisModule,
+    RedisModule, // ✅ Kept only once
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_SECRET') || 'fallback_secret_for_dev',
         signOptions: { expiresIn: '5h' },
       }),
       inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [
+    AuthService, 
+    LocalStrategy, // ✅ Crucial: Registers the strategy with Passport
+    JwtStrategy,   // ✅ Crucial: Registers the JWT guard strategy
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -70,6 +70,8 @@ model School {
   subscription SchoolSubscription?
   retentionPolicy   DataRetentionPolicy?
   deletionRequests  DeletionRequest[]
+    notifications     Notification[]
+    timetableSlots TimetableSlot[]
 
   @@map("schools")
 }
@@ -129,6 +131,7 @@ model User {
   staff                 Staff?
 
   @@unique([email, school_id])
+    notifications     Notification[]
   @@map("users")
 }
 
@@ -206,6 +209,7 @@ model Stream {
   capacity Int    @default(40) @map("capacity")
 
   students Student[]
+  timetableSlots TimetableSlot[]
 
   @@unique([class_id, name])
   @@map("streams")
@@ -342,6 +346,7 @@ model Subject {
   examResults    ExamResult[]
   cbtExams       CBTExam[]
   studyMaterials StudyMaterial[]
+  timetableSlots TimetableSlot[]
 
   @@unique([school_id, code])
   @@map("subjects")
@@ -907,6 +912,7 @@ model Staff {
   leaveRequests  LeaveRequest[]
   payrollRecords PayrollRecord[]
   attendances    StaffAttendance[]
+  timetableSlots TimetableSlot[]
 
   @@unique([school_id, employee_id])
   @@map("staff")
@@ -1554,4 +1560,46 @@ model DeletionRequest {
   created_at          DateTime @default(now()) @map("created_at")
 
   @@map("deletion_requests")
+}
+model Notification {
+  id          String   @id @default(uuid()) @map("id")
+  school_id   String   @map("school_id")
+  school      School   @relation(fields: [school_id], references: [id])
+  
+  user_id     String?  @map("user_id")
+  user        User?    @relation(fields: [user_id], references: [id])
+
+  title       String   @map("title")
+  message     String   @map("message")
+  is_read     Boolean  @default(false) @map("is_read")
+  
+  created_at  DateTime @default(now()) @map("created_at")
+
+  @@index([school_id, user_id, is_read])
+  @@map("notifications")
+}
+
+model TimetableSlot {
+  id         String   @id @default(uuid()) @map("id")
+  school_id  String   @map("school_id")
+  school     School   @relation(fields: [school_id], references: [id])
+  
+  stream_id  String   @map("stream_id")
+  stream     Stream   @relation(fields: [stream_id], references: [id])
+  
+  day        String   @map("day") // e.g., "Monday"
+  start_time String   @map("start_time") // e.g., "08:00"
+  end_time   String   @map("end_time") // e.g., "09:00"
+  
+  subject_id String?  @map("subject_id")
+  subject    Subject? @relation(fields: [subject_id], references: [id])
+  
+  staff_id   String?  @map("staff_id")
+  staff      Staff?   @relation(fields: [staff_id], references: [id])
+
+  created_at DateTime @default(now()) @map("created_at")
+  updated_at DateTime @updatedAt @map("updated_at")
+
+  @@unique([stream_id, day, start_time])
+  @@map("timetable_slots")
 }

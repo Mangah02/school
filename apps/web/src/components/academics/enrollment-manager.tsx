@@ -30,7 +30,7 @@ export function EnrollmentManager() {
     try {
       // Fetch students who don't have an active enrollment for the current term
       const [stuRes, clsRes] = await Promise.all([
-        api.get('/students?unenrolled=true'), 
+        api.get('/student?unenrolled=true'), 
         api.get('/academic/classes')
       ]);
       setStudents(stuRes.data);

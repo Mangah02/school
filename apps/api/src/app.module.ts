@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'; 
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { BullModule } from '@nestjs/bull';// Added APP_INTERCEPTOR here
+import { BullModule } from '@nestjs/bull';
+import { AuthModule } from './modules/auth/auth.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 // Core Imports
 import { PrismaModule } from './core/prisma/prisma.module';
@@ -33,6 +36,7 @@ import { BoardingModule } from './modules/boarding/boarding.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { HealthModule } from './modules/health/health.module';
 import { PublicWebsiteModule } from './modules/public-website/public-website.module';
+import { GuardianModule } from './modules/guardian/guardian.module';
 
 // Global Guards & Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -40,6 +44,7 @@ import { TenantGuard } from './core/guards/tenant.guard';
 import { PermissionsGuard } from './core/guards/permissions.guard';
 import { OwnershipGuard } from './core/guards/ownership.guard';
 import { AuditInterceptor } from './core/interceptors/audit.interceptor';
+import { AppGateway } from './app.gateway';
 
 @Module({
   imports: [
@@ -62,12 +67,16 @@ import { AuditInterceptor } from './core/interceptors/audit.interceptor';
 
     // Core
     PrismaModule, 
+    AuthModule,
     TenantModule, 
     RedisModule, 
     AuditModule, 
     QueueModule, 
     StorageModule, 
     SearchModule,
+     ComplianceModule,
+    NotificationsModule,
+    GuardianModule,
     
     // Functional (PublicWebsiteModule is imported here, handling its own internals)
     StudentModule, 
@@ -101,6 +110,7 @@ import { AuditInterceptor } from './core/interceptors/audit.interceptor';
     
     // Audit Interceptor
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+     AppGateway,
   ],
 })
 export class AppModule {}

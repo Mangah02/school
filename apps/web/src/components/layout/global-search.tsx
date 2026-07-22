@@ -1,36 +1,27 @@
 // apps/web/src/components/layout/global-search.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Search, Users, GraduationCap, BookOpen, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Loader2 } from 'lucide-react';
 import {
-  CommandDialog,
+  Command,
+  CommandInput,
+  CommandList,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
-  CommandList,
 } from '@/components/ui/command';
-import { useDebounce } from '@/hooks/useDebounce';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
-import { Badge } from '@/components/ui/badge';
-
-interface SearchResult {
-  students: any[];
-  staff: any[];
-  books: any[];
-  total_results: number;
-}
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  
-  const debouncedQuery = useDebounce(query, 400); // Wait 400ms after typing stops
+  const [searchQuery, setSearchQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Keyboard shortcut (Cmd+K / Ctrl+K)
+  // Keyboard shortcut to open (Ctrl/Cmd + K)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -42,112 +33,74 @@ export function GlobalSearch() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  // Fetch data when debounced query changes
+  // Debounce search to avoid spamming the backend
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 2) {
-      setResults(null);
-      return;
-    }
-
-    const fetchResults = async () => {
-      setLoading(true);
-      try {
-        // Calls the Phase 10.3 Search Endpoint
-        const res = await api.get('/search', { params: { q: debouncedQuery } });
-        setResults(res.data);
-      } catch (error) {
-        console.error('Search failed', error);
-      } finally {
-        setLoading(false);
+    const timer = setTimeout(async () => {
+      if (searchQuery.length > 2) {
+        setIsLoading(true);
+        try {
+          // Calls your backend search endpoint
+          const res = await api.get(`/search?q=${encodeURIComponent(searchQuery)}`);
+          setResults(res.data || []);
+        } catch (error) {
+          console.error('Search failed:', error);
+          setResults([]);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setResults([]);
       }
-    };
+    }, 300); // 300ms debounce
 
-    fetchResults();
-  }, [debouncedQuery]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   return (
     <>
-      <button
+      {/* ✅ THIS IS THE VISIBLE BUTTON. It renders directly in the TopBar. */}
+      <Button
+        variant="outline"
+        className="relative h-9 w-full justify-start text-left text-muted-foreground sm:pr-12 md:w-40 lg:w-64"
         onClick={() => setOpen(true)}
-        className="relative flex items-center gap-2 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-lg px-3 py-2 text-sm transition w-64"
       >
-        <Search className="h-4 w-4" />
-        <span>Search students, staff, books...</span>
-        <kbd className="absolute right-2 pointer-events-none hidden md:inline-block h-5 select-none items-center gap-1 rounded border bg-gray-50 px-1.5 font-mono text-[10px] font-medium text-gray-600 opacity-100">
-          ⌘K
+        <Search className="mr-2 h-4 w-4" />
+        <span className="hidden sm:inline-flex">Search...</span>
+        <kbd className="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+          <span className="text-xs">⌘</span>K
         </kbd>
-      </button>
+      </Button>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput 
-          placeholder="Type a name, admission number, or ISBN..." 
-          value={query}
-          onValueChange={setQuery}
-        />
-        <CommandList>
-          {loading && (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            </div>
-          )}
+      {/* The Dialog that opens when the button is clicked */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="overflow-hidden p-0 shadow-lg max-w-2xl">
+          <DialogTitle className="sr-only">Global Search</DialogTitle>
+          <DialogDescription className="sr-only">Search for students, staff, and more.</DialogDescription>
           
-          {!loading && results && results.total_results === 0 && (
-            <CommandEmpty>No results found for "{query}".</CommandEmpty>
-          )}
-
-          {!loading && results && results.total_results > 0 && (
-            <>
-              {results.students.length > 0 && (
-                <CommandGroup heading="Students">
-                  {results.students.map((student) => (
-                    <CommandItem key={student.id} className="flex justify-between">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-500" />
-                        <span>{student.first_name} {student.last_name}</span>
-                      </div>
-                      <Badge variant="outline">{student.admission_number}</Badge>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+          {/* ✅ The Command component properly wraps the Input to prevent the 'subscribe' error */}
+          <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+            <CommandInput placeholder="Type to search..." value={searchQuery} onValueChange={setSearchQuery} />
+            <CommandList>
+              {isLoading ? (
+                <div className="p-4 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Searching...
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>No results found.</CommandEmpty>
+                  <CommandGroup heading="Results">
+                    {results.map((item: any, index: number) => (
+                      <CommandItem key={index} value={item.name || item.title || 'item'}>
+                        <span>{item.name || item.title || 'Unknown'}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
               )}
-
-              {results.staff.length > 0 && (
-                <CommandGroup heading="Staff">
-                  {results.staff.map((staff) => (
-                    <CommandItem key={staff.id} className="flex justify-between">
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-green-500" />
-                        <span>{staff.first_name} {staff.last_name}</span>
-                      </div>
-                      <Badge variant="outline">{staff.employee_id}</Badge>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-
-              {results.books.length > 0 && (
-                <CommandGroup heading="Library Books">
-                  {results.books.map((book) => (
-                    <CommandItem key={book.id} className="flex justify-between">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-purple-500" />
-                        <span>{book.title}</span>
-                      </div>
-                      <Badge variant="outline">{book.isbn}</Badge>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </>
-          )}
-          
-          {!loading && !results && (
-            <div className="p-8 text-center text-sm text-gray-500">
-              Start typing to search across the entire school database...
-            </div>
-          )}
-        </CommandList>
-      </CommandDialog>
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
