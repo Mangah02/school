@@ -41,7 +41,9 @@ export function GuardianLinkDialog({ student, onClose, onSuccess }: Props) {
       try {
         const res = await api.get('/guardians');
         setGuardians(res.data);
-      } catch (error) { console.error(error); }
+      } catch (error) { 
+        console.error('Failed to fetch guardians:', error); 
+      }
     };
     fetchGuardians();
   }, []);
@@ -51,18 +53,31 @@ export function GuardianLinkDialog({ student, onClose, onSuccess }: Props) {
     setIsLoading(true);
     try {
       // Calls Phase 5.4 Backend Endpoint
-      await api.post(`/students/${student.id}/guardians`, { 
+      await api.post(`/student/${student.id}/guardians`, { 
         guardian_id: selectedGuardianId,
         is_primary: false 
       });
+      
+      // ✅ Show specific success message
+      toast.success('Guardian linked successfully!');
       onSuccess();
       onClose();
-    } catch (error) {
-         toast.error('Failed to link guardian. They may already be linked.'); 
-        } finally { setIsLoading(false); }
+    } catch (error: any) {
+      // ✅ Extract and show the specific backend error message (e.g., "Guardian is already linked to this student")
+      const errorMessage = error.response?.data?.message || 'Failed to link guardian. They may already be linked.';
+      toast.error(errorMessage); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const handleCreateAndLink = async () => {
+    // ✅ Basic validation before sending request
+    if (!newGuardian.first_name || !newGuardian.last_name || !newGuardian.phone) {
+      toast.error('Please fill in First Name, Last Name, and Phone Number.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Create Guardian
@@ -70,17 +85,22 @@ export function GuardianLinkDialog({ student, onClose, onSuccess }: Props) {
       const newId = res.data.id;
       
       // 2. Link to Student
-      await api.post(`/students/${student.id}/guardians`, { 
+      await api.post(`/student/${student.id}/guardians`, { 
         guardian_id: newId,
         is_primary: true 
       });
       
+      // ✅ Show specific success message
+      toast.success('New guardian created and linked successfully!');
       onSuccess();
       onClose();
-    } catch (error) { 
-        toast.error('Failed to create or link guardian.');
-
-    } finally { setIsLoading(false); }
+    } catch (error: any) { 
+      // ✅ Extract and show the specific backend error message
+      const errorMessage = error.response?.data?.message || 'Failed to create or link guardian.';
+      toast.error(errorMessage);
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   return (
@@ -96,16 +116,20 @@ export function GuardianLinkDialog({ student, onClose, onSuccess }: Props) {
           {/* Option 1: Link Existing */}
           <div className="space-y-2 border-b pb-4">
             <Label className="text-base font-semibold">Link Existing Guardian</Label>
-            <Select onValueChange={setSelectedGuardianId}>
+            <Select onValueChange={setSelectedGuardianId} value={selectedGuardianId}>
               <SelectTrigger>
                 <SelectValue placeholder="Search and select a guardian..." />
               </SelectTrigger>
               <SelectContent>
-                {guardians.map(g => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.first_name} {g.last_name} ({g.phone})
-                  </SelectItem>
-                ))}
+                {guardians.length === 0 ? (
+                  <div className="p-2 text-sm text-gray-500">No guardians found in the system.</div>
+                ) : (
+                  guardians.map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.first_name} {g.last_name} ({g.phone})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <Button 
@@ -130,12 +154,24 @@ export function GuardianLinkDialog({ student, onClose, onSuccess }: Props) {
             {isCreating && (
               <div className="space-y-3 p-3 bg-gray-50 rounded-lg border">
                 <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="First Name" value={newGuardian.first_name} onChange={e => setNewGuardian({...newGuardian, first_name: e.target.value})} />
-                  <Input placeholder="Last Name" value={newGuardian.last_name} onChange={e => setNewGuardian({...newGuardian, last_name: e.target.value})} />
+                  <Input 
+                    placeholder="First Name" 
+                    value={newGuardian.first_name} 
+                    onChange={e => setNewGuardian({...newGuardian, first_name: e.target.value})} 
+                  />
+                  <Input 
+                    placeholder="Last Name" 
+                    value={newGuardian.last_name} 
+                    onChange={e => setNewGuardian({...newGuardian, last_name: e.target.value})} 
+                  />
                 </div>
-                <Input placeholder="Phone Number (e.g., 0712345678)" value={newGuardian.phone} onChange={e => setNewGuardian({...newGuardian, phone: e.target.value})} />
+                <Input 
+                  placeholder="Phone Number (e.g., 0712345678)" 
+                  value={newGuardian.phone} 
+                  onChange={e => setNewGuardian({...newGuardian, phone: e.target.value})} 
+                />
                 <Select value={newGuardian.relationship} onValueChange={val => setNewGuardian({...newGuardian, relationship: val})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Relationship" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="FATHER">Father</SelectItem>
                     <SelectItem value="MOTHER">Mother</SelectItem>

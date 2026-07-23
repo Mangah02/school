@@ -8,9 +8,13 @@ import { MpesaService } from './mpesa.service';               // ✅ Import othe
 import { WaiverService } from './waiver.service';             // ✅ Import other services you have
 import { ReconciliationService } from './reconciliation.service'; // ✅ Import other services you have
 import { JournalService } from './journal.service';           // ✅ Import other services you have
+import { ReconciliationController } from './reconciliation.controller';
+import { WaiverController } from './waiver.controller';
+
+
 
 @Module({
-  controllers: [FinanceController],
+  controllers: [FinanceController, ReconciliationController, WaiverController],
   providers: [
     InvoicingService,
     FeeStructureService, // ✅ MUST be listed here for FinanceController to inject it

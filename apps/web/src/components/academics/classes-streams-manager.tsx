@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,18 +27,25 @@ export function ClassesStreamsManager() {
     try {
       const res = await api.get('/academic/classes');
       setClasses(res.data);
-    } catch (error) { toast.error('Failed to load classes'); } finally { setLoading(false); }
+    } catch (error) { 
+      toast.error('Failed to load classes'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  useEffect(() => { fetchClasses(); }, []);
+  useEffect(() => { 
+    fetchClasses(); 
+  }, []);
 
   const handleOpenDialog = (cls?: ClassItem) => {
     if (cls) {
       setEditingClass(cls);
+      // ✅ Pre-fill form with existing data safely
       setFormData({ 
-        name: cls.name, 
-        level: cls.level.toString(), 
-        streams: cls.streams.map(s => s.name).join(', ') 
+        name: cls.name || '', 
+        level: cls.level !== undefined ? String(cls.level) : '', 
+        streams: cls.streams && cls.streams.length > 0 ? cls.streams.map(s => s.name).join(', ') : ''
       });
     } else {
       setEditingClass(null);
@@ -48,11 +55,42 @@ export function ClassesStreamsManager() {
   };
 
   const handleSave = async () => {
+    // ✅ Strict but fair validation
+    const trimmedName = formData.name.trim();
+    const trimmedLevel = formData.level.trim();
+
+    if (!trimmedName) {
+      toast.error('Class Name is required');
+      return;
+    }
+    if (!trimmedLevel) {
+      toast.error('Class Level is required');
+      return;
+    }
+
+    const levelNum = parseInt(trimmedLevel, 10);
+    if (isNaN(levelNum)) {
+      toast.error('Class Level must be a valid number (e.g., 1, 2, 3)');
+      return;
+    }
+
+    // ✅ Format streams into an array of objects
+    const streamList = formData.streams
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(name => ({ name, capacity: 40 }));
+
+    if (streamList.length === 0) {
+      toast.error('At least one stream is required (e.g., North, South)');
+      return;
+    }
+
     try {
       const payload = {
-        name: formData.name,
-        level: parseInt(formData.level),
-        streams: formData.streams.split(',').map(s => s.trim()).filter(Boolean).map(name => ({ name, capacity: 40 }))
+        name: trimmedName,
+        level: levelNum, // ✅ Guaranteed to be a valid number here
+        streams: streamList,
       };
 
       if (editingClass) {
@@ -65,7 +103,10 @@ export function ClassesStreamsManager() {
       setIsDialogOpen(false);
       fetchClasses();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to save class');
+      // ✅ Show the exact backend error message
+      const errorMsg = error.response?.data?.message || 'Failed to save class';
+      toast.error(errorMsg);
+      console.error('Save class error details:', error.response?.data);
     }
   };
 
@@ -125,16 +166,29 @@ export function ClassesStreamsManager() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label>Class Name (e.g., Grade 7)</Label>
-              <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <Label>Class Name (e.g., Form 3)</Label>
+              <Input 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})} 
+                placeholder="Form 3" 
+              />
             </div>
             <div>
-              <Label>Level (e.g., 7)</Label>
-              <Input type="number" value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})} />
+              <Label>Level (e.g., 3)</Label>
+              <Input 
+                type="number" 
+                value={formData.level} 
+                onChange={e => setFormData({...formData, level: e.target.value})} 
+                placeholder="3" 
+              />
             </div>
             <div>
-              <Label>Streams (Comma separated, e.g., North, South, East)</Label>
-              <Input value={formData.streams} onChange={e => setFormData({...formData, streams: e.target.value})} placeholder="North, South" />
+              <Label>Streams (Comma separated, e.g., North, South)</Label>
+              <Input 
+                value={formData.streams} 
+                onChange={e => setFormData({...formData, streams: e.target.value})} 
+                placeholder="North, South" 
+              />
             </div>
           </div>
           <DialogFooter>

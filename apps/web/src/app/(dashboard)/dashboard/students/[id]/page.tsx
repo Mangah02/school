@@ -40,7 +40,7 @@ export default function StudentProfilePage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await api.get(`/students/${id}`);
+        const res = await api.get(`/student/${id}`);
         setStudent(res.data);
       } catch (error) {
         console.error('Failed to fetch profile', error);

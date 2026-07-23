@@ -66,7 +66,6 @@ export class StudentsService {
       throw new BadRequestException('School ID missing from authentication token');
     }
 
-    // Verify the student belongs to the school and is not deleted
     const existing = await this.prisma.student.findFirst({
       where: { id, school_id: schoolId, is_deleted: false }
     });
@@ -84,6 +83,47 @@ export class StudentsService {
         date_of_birth: data.date_of_birth ? new Date(data.date_of_birth) : undefined,
         gender: data.gender,
         nationality: data.nationality,
+      },
+    });
+  }
+
+  async linkGuardian(studentId: string, guardianId: string, schoolId: string) {
+    if (!schoolId) {
+      throw new BadRequestException('School ID missing from authentication token');
+    }
+
+    // 1. Verify student belongs to school
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, school_id: schoolId, is_deleted: false }
+    });
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // 2. Verify guardian belongs to school
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { id: guardianId, school_id: schoolId, is_deleted: false }
+    });
+    if (!guardian) {
+      throw new NotFoundException('Guardian not found');
+    }
+
+    // 3. Check if already linked
+    const existingLink = await this.prisma.guardianStudent.findFirst({
+      where: { student_id: studentId, guardian_id: guardianId }
+    });
+    if (existingLink) {
+      throw new BadRequestException('Guardian is already linked to this student');
+    }
+
+    // 4. Create the link
+    return this.prisma.guardianStudent.create({
+      data: {
+        student_id: studentId,
+        guardian_id: guardianId,
+      },
+      include: {
+        guardian: true,
       },
     });
   }

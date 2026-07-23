@@ -28,17 +28,23 @@ export function EnrollmentManager() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch students who don't have an active enrollment for the current term
+      // ✅ Use the dedicated /student/unenrolled endpoint we created earlier
       const [stuRes, clsRes] = await Promise.all([
-        api.get('/student?unenrolled=true'), 
+        api.get('/student/unenrolled'), 
         api.get('/academic/classes')
       ]);
       setStudents(stuRes.data);
       setClasses(clsRes.data);
-    } catch (error) { toast.error('Failed to load enrollment data'); } finally { setLoading(false); }
+    } catch (error) { 
+      toast.error('Failed to load enrollment data'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    fetchData(); 
+  }, []);
 
   const selectedClass = classes.find(c => c.id === selectedClassId);
 
@@ -49,17 +55,21 @@ export function EnrollmentManager() {
     }
     setIsSubmitting(true);
     try {
-      // Calls Phase 5.6 Backend Enrollment Endpoint
+      // ✅ Calls the new Backend Enrollment Endpoint
       await api.post('/academic/enrollments', {
         student_id: selectedStudentId,
         stream_id: selectedStreamId
       });
       toast.success('Student enrolled successfully!');
       setSelectedStudentId('');
+      setSelectedClassId('');
+      setSelectedStreamId('');
       fetchData(); // Refresh list
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Enrollment failed');
-    } finally { setIsSubmitting(false); }
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   return (
@@ -67,7 +77,9 @@ export function EnrollmentManager() {
       {/* Enrollment Form */}
       <Card className="lg:col-span-1">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2"><UserCheck className="h-5 w-5 text-green-600" /> Enroll Student</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <UserCheck className="h-5 w-5 text-green-600" /> Enroll Student
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -76,7 +88,9 @@ export function EnrollmentManager() {
               <SelectTrigger><SelectValue placeholder="Choose unenrolled student..." /></SelectTrigger>
               <SelectContent>
                 {students.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.admission_number})</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.first_name} {s.last_name} ({s.admission_number})
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -102,7 +116,7 @@ export function EnrollmentManager() {
             </Select>
           </div>
 
-          <Button onClick={handleEnroll} disabled={isSubmitting} className="w-full bg-green-600 hover:bg-green-700 mt-4">
+          <Button onClick={handleEnroll} disabled={isSubmitting || !selectedStudentId || !selectedStreamId} className="w-full bg-green-600 hover:bg-green-700 mt-4">
             {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UserCheck className="mr-2 h-4 w-4" />}
             Confirm Enrollment
           </Button>
@@ -115,7 +129,9 @@ export function EnrollmentManager() {
           <CardTitle className="text-lg">Pending Enrollments ({students.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div> : (
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -126,7 +142,11 @@ export function EnrollmentManager() {
               </TableHeader>
               <TableBody>
                 {students.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center text-gray-500 py-6">All students are enrolled! 🎉</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-gray-500 py-6">
+                      All students are enrolled! 🎉
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   students.map(s => (
                     <TableRow key={s.id}>

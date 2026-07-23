@@ -17,16 +17,17 @@ export class StudentController {
     return this.studentsService.findAll(query, req.user.school_id);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a single student by ID' })
-  async findOne(@Param('id') id: string, @Req() req: Request & { user: any }) {
-    return this.studentsService.findOne(id, req.user.school_id);
-  }
-
+  // ✅ FIX: Specific routes MUST come before parameterized routes like ':id'
   @Get('unenrolled')
   @ApiOperation({ summary: 'Get students who are not currently enrolled in any class' })
   async getUnenrolledStudents(@Req() req: Request & { user: any }) {
     return this.studentsService.getUnenrolledStudents(req.user.school_id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single student by ID' })
+  async findOne(@Param('id') id: string, @Req() req: Request & { user: any }) {
+    return this.studentsService.findOne(id, req.user.school_id);
   }
 
   @Post()
@@ -39,5 +40,15 @@ export class StudentController {
   @ApiOperation({ summary: 'Update an existing student' })
   async updateStudent(@Param('id') id: string, @Body() body: any, @Req() req: Request & { user: any }) {
     return this.studentsService.updateStudent(id, body, req.user.school_id);
+  }
+
+  @Post(':id/guardians')
+  @ApiOperation({ summary: 'Link an existing guardian to a student' })
+  async linkGuardian(
+    @Param('id') studentId: string, 
+    @Body() body: { guardian_id: string }, 
+    @Req() req: Request & { user: any }
+  ) {
+    return this.studentsService.linkGuardian(studentId, body.guardian_id, req.user.school_id);
   }
 }

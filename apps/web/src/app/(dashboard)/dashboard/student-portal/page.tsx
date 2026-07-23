@@ -31,7 +31,7 @@ export default function StudentPortalPage() {
     const fetchStats = async () => {
       try {
         // Backend maps user.id to student_id and enforces OwnershipGuard
-        const res = await api.get('/students/my-portal-stats'); 
+        const res = await api.get('/student/my-portal-stats'); 
         setStats(res.data);
       } catch (error) {
         toast.error('Failed to load your portal data');

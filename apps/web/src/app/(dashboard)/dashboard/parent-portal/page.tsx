@@ -32,7 +32,7 @@ export default function ParentPortalPage() {
       setLoading(true);
       try {
         // Strictly scoped by OwnershipGuard on the backend
-        const res = await api.get(`/students/${selectedChildId}/parent-portal-data`);
+        const res = await api.get(`/student/${selectedChildId}/parent-portal-data`);
         setData(res.data);
       } catch (error) {
         toast.error('Failed to load portal data');

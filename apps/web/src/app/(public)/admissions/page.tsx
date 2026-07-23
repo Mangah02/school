@@ -43,17 +43,26 @@ export default function AdmissionsPage() {
     resolver: zodResolver(admissionSchema),
   });
 
-  const onSubmit = async (data: AdmissionForm) => {
+    const onSubmit = async (data: AdmissionForm) => {
+    const schoolId = process.env.NEXT_PUBLIC_DEFAULT_SCHOOL_ID;
+    
+    // ✅ Safety check to prevent sending undefined
+    if (!schoolId) {
+      console.error('NEXT_PUBLIC_DEFAULT_SCHOOL_ID is not set in .env.local');
+      toast.error('Configuration error: School ID is missing. Please contact support.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Calls Phase 10.5 Admissions Intake Endpoint
       await api.post('/public/admissions/apply', {
-        school_id: process.env.NEXT_PUBLIC_DEFAULT_SCHOOL_ID,
+        school_id: schoolId,
         ...data
       });
       setIsSuccess(true);
       toast.success('Application submitted successfully!');
     } catch (error: any) {
+      console.error('Admission submission error:', error.response?.data);
       toast.error(error.response?.data?.message || 'Failed to submit application.');
     } finally {
       setIsSubmitting(false);

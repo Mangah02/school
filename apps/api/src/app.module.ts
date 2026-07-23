@@ -37,6 +37,8 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { HealthModule } from './modules/health/health.module';
 import { PublicWebsiteModule } from './modules/public-website/public-website.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
+import { PublicModule } from './modules/public/public.module';
+
 
 // Global Guards & Interceptors
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -67,6 +69,7 @@ import { AppGateway } from './app.gateway';
 
     // Core
     PrismaModule, 
+     PublicModule,
     AuthModule,
     TenantModule, 
     RedisModule, 
